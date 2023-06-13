@@ -10,3 +10,15 @@ declare global {
 }
 
 export {};
+
+type userType = {
+    user_id: number,
+    username: string,
+    password: string,
+    is_admin: boolean,
+    email?: string,
+    created_time?: string,
+    last_update?: string,
+    inspection_station_id?: string,
+}
+
