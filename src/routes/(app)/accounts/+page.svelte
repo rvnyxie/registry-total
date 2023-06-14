@@ -13,7 +13,8 @@
 	} from 'flowbite-svelte';
 	import { onMount, afterUpdate } from 'svelte';
 
-	export let form;
+	export let form
+	export let data
 
 	type userType = {
 		user_id: number;
@@ -26,49 +27,18 @@
 		inspection_station_id?: string;
 	};
 
-	let default_accounts = [
-		{
-			user_id: 1,
-			username: 'ntn',
-			password: '1',
-			is_admin: true,
-			email: 'ntn@mail.com',
-			created_time: '2023-05-15',
-			last_update: '2023-06-13',
-			inspection_station_id: ''
-		},
-		{
-			user_id: 2,
-			username: 'guest',
-			password: '2',
-			is_admin: false,
-			email: 'guest@mail.com',
-			created_time: '2023-05-20',
-			last_update: '2023-06-13',
-			inspection_station_id: 'station1'
-		}
-	];
-
 	// assign value early to prevent 500 error
 	// get value from local storage too soon give 500 error
-	let accounts: userType[] = default_accounts
+	let accounts: userType[] = data.accountsData
+	let role = data.role
+
+	if (role === 'not_admin') {
+		goto('/')
+	}
 
 	console.log(accounts);
 
-	onMount(() => {
-		// normal user not allowed to access this page
-		const isAdmin = localStorage.getItem('role');
-		if (isAdmin === 'not_admin') {
-			goto('/');
-		}
-
-		let localAccounts = localStorage.getItem('accounts') as string;
-
-		if (localAccounts !== null) {
-			accounts = JSON.parse(localAccounts);
-		} else {
-			accounts = default_accounts;
-		}
+	onMount(() => {		
 	});
 
 	afterUpdate(() => {

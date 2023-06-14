@@ -1,9 +1,5 @@
 import * as userDB from '$lib/database/tables/user'
 
-export function load() {
-    return {}
-}
-
 export const actions = {
     changeUser: async ({ request }) => {
         const data = await request.formData()
