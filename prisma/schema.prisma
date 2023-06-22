@@ -1,0 +1,93 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  // can use env variables here
+  url      = "file:./dev.db"
+}
+
+model Owner {
+  id             String @id
+  address        String
+  phoneNumber    String @unique
+  email          String @unique
+  ownerType      String
+  fullName       String
+  companyName    String
+  typeOfBusiness String
+  companyType    String
+  car            Car[]
+}
+
+model Car {
+  id                 Int             @id @default(autoincrement())
+  registrationNumber String          @unique
+  registrationDate   DateTime
+  licensePlateNumber String          @unique
+  owner              Owner           @relation(fields: [ownerId], references: [id])
+  ownerId            String
+  carModel           CarModel        @relation(fields: [carModelId], references: [id])
+  carModelId         Int
+  usagePurpose       UsagePurpose    @relation(fields: [usagePurposeId], references: [id])
+  usagePurposeId     Int
+  carInspection      CarInspection[]
+}
+
+model CarModel {
+  id               Int    @id @default(autoincrement())
+  modelName        String @unique
+  manufacturer     String
+  version          String
+  engineType       String
+  fuelType         String
+  transmissionType String
+  horsepower       String
+  torque           String
+  seatingCapacity  Int
+  car              Car[]
+}
+
+model UsagePurpose {
+  id      Int    @id @default(autoincrement())
+  purpose String @unique
+  car     Car[]
+}
+
+model CarInspection {
+  id                  String            @id
+  inspectionType      String
+  inspectionDate      DateTime          @default(now())
+  result              String
+  expiredDate         DateTime
+  note                String
+  car                 Car               @relation(fields: [carId], references: [id])
+  carId               Int
+  inspectionStation   InspectionStation @relation(fields: [inspectionStationId], references: [id])
+  inspectionStationId Int
+}
+
+model InspectionStation {
+  id                    Int             @id @default(autoincrement())
+  stationName           String          @unique
+  stattionAdrress       String
+  inspectionStationType String
+  carInspection         CarInspection[]
+  user                  User[]
+}
+
+model User {
+  id                  Int                @id @default(autoincrement())
+  username            String             @unique
+  password            String
+  email               String             @unique
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  isAdmin             Boolean            @default(false)
+  inspectionStation   InspectionStation? @relation(fields: [inspectionStationId], references: [id])
+  inspectionStationId Int?               @unique
+}
