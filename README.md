@@ -1,5 +1,5 @@
 # RegistryTotal Project
-Registration Management System
+Registration Management System<br>  
 RegistryTotal is a web application developed to support the Vehicle Registration Department and inspection centers nationwide in managing vehicle inspections for automobiles.
 
 ## Technology used:
@@ -8,7 +8,7 @@ RegistryTotal is a web application developed to support the Vehicle Registration
 
 - TailwindCSS
 
-- Database: Sqlite (with the support of Prisma). Here is [`the design`](`https://drive.google.com/file/d/1mZW18g7-S2kMsiV3-fFJsAKn7yUjEkik/view?usp=sharing`) of database.
+- Database: Sqlite (with the support of Prisma). Here is [the design](https://drive.google.com/file/d/1mZW18g7-S2kMsiV3-fFJsAKn7yUjEkik/view?usp=sharing) of database.
 
 ## Guides to install
 
