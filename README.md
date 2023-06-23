@@ -29,4 +29,7 @@ You can also reset database (data will be reset and then the seed file will be t
 ```bash
 npx prisma migrate reset
 ```
+Default login data:
+- User 1: { username: 'admin', password: 'admin' }
+- User 2: { username: 'normal', password: 'normal' }
 

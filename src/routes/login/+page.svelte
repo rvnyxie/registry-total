@@ -48,6 +48,7 @@
 					<label for="username" class="text-sm">Username</label>
 					<input
 						type="text"
+						id="username"
 						name="username"
 						class="text-sm font-medium block w-full rounded-lg bg-[#D9D9D9] border-0 border-b border-primary focus:border-transparent focus:ring-2 focus:ring-brown focus:bg-white"
 						required
@@ -57,6 +58,7 @@
 					<label for="password" class="text-sm">Password</label>
 					<input
 						type="password"
+						id="password"
 						name="password"
 						class="text-sm font-medium block w-full rounded-lg bg-[#D9D9D9] border-0 border-b border-primary focus:border-transparent focus:ring-2 focus:ring-brown focus:bg-white"
 						required
