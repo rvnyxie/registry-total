@@ -16,7 +16,7 @@
 	import { page } from '$app/stores';
 
 	// Holy, we need to import to make image work??
-	import logo from '$lib/assets/logo_2.png';
+	import logo from '$lib/assets/logo.png';
 
 	let role: string = '';
 	// there's a bug here, if not put this in onMount, will get 500 error (ask gpt for more)
