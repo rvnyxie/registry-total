@@ -11,13 +11,13 @@
 		Chevron
 	} from 'flowbite-svelte';
 	import { Footer, FooterLinkGroup, FooterLink } from 'flowbite-svelte';
-	import { afterUpdate, onMount } from 'svelte';
+	import { afterUpdate } from 'svelte';
 	import { page } from '$app/stores';
 
 	// Holy, we need to import to make image work??
 	import logo from '$lib/assets/logo.png';
 
-	let role: string = 'admin';
+	let role: string = $page.data.user.isAdmin ? 'admin' : 'regular';
 
 	let currentPath = '';
 	let carPathExtraInfo = '';

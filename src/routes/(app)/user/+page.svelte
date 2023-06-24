@@ -1,113 +1,108 @@
 <script lang="ts">
+	import type { PageData } from './$types';
 	import { enhance } from '$app/forms';
-	import { goto } from '$app/navigation';
+
 	import { Label, Input, Button } from 'flowbite-svelte';
 
-	type userType = {
-		user_id: number;
-		username: string;
-		password: string;
-		is_admin: boolean;
-		email?: string;
-		created_time?: string;
-		last_update?: string;
-		inspection_station_id?: string;
-	};
+	export let data: PageData;
 
-	let accountData: userType
+	const userData = data.user;
 
-	try {
-		let localAccounts = localStorage.getItem('accounts');
-		if (localAccounts !== null) {
-			localAccounts = JSON.parse(localAccounts);
-			let currentUsername = localStorage.getItem('username') ?? '';
+	function formatDate(date: Date) {
+		const options = {
+			weekday: 'long',
+			month: 'short',
+			day: 'numeric',
+			year: 'numeric',
+			hour: 'numeric',
+			minute: 'numeric',
+			second: 'numeric'
+		};
 
-			// @ts-ignore
-			accountData = localAccounts.find((account) => {
-				if (account.username === currentUsername) {
-					return account;
-				}
-			});
-		}
-	} catch (error) {
-		console.error(error);
+		return date.toLocaleDateString('en-US', options);
 	}
 </script>
 
 <div class="grow w-4/5 rounded-xl p-4 bg-gray-50 overflow-scroll text-brown">
-	<form method="POST" action="" use:enhance on:submit|preventDefault>
-		<Label class="space-y-2">
-			<span>User ID</span>
-			<Input type="text" name="user_id" placeholder="a number" value={accountData?.user_id} />
-		</Label>
-		<Label class="space-y-2">
-			<span>Username</span>
-			<Input type="text" name="username" placeholder="username" value={accountData?.username} />
-		</Label>
-		<Label class="space-y-2">
-			<span>Password</span>
+	<form method="POST" action="?/logout" use:enhance>
+		<Label class="space-y-2 mb-2">
+			<span class="font-bold text-brown">Username</span>
 			<Input
 				type="text"
-				name="password"
-				placeholder="•••••"
-				value={accountData?.password}
-				required
+				name="username"
+				placeholder="username"
+				class="!text-brown font-medium"
+				value={userData?.username}
+				readonly
 			/>
 		</Label>
-		<Label class="space-y-2">
-			<span>Is admin</span>
+		<Label class="space-y-2 mb-2">
+			<span class="font-bold text-brown">Is admin</span>
 			<Input
 				type="text"
-				name="is_admin"
+				name="isAdmin"
 				placeholder="yes/no"
-				value={accountData?.is_admin}
-				required
+				class="!text-brown font-medium"
+				value={userData?.isAdmin}
+				readonly
 			/>
 		</Label>
-		<Label class="space-y-2">
-			<span>Email</span>
-			<Input type="email" name="email" placeholder="name@company.com" value={accountData?.email} />
-		</Label>
-		<Label class="space-y-2">
-			<span>Created Time</span>
+		<Label class="space-y-2 mb-2">
+			<span class="font-bold text-brown">Email</span>
 			<Input
-				type="date"
-				name="created_time"
-				placeholder="2023-06-01"
-				value={accountData?.created_time}
+				type="email"
+				name="email"
+				placeholder="name@company.com"
+				class="!text-brown font-medium"
+				value={userData?.email}
+				readonly
 			/>
 		</Label>
-		<Label class="space-y-2">
-			<span>Last Update</span>
-			<Input
-				type="date"
-				name="last_update"
-				placeholder="2023-06-15"
-				value={accountData?.last_update}
-			/>
-		</Label>
-		<Label class="space-y-2">
-			<span>Inspection Station ID</span>
+		<Label class="space-y-2 mb-2">
+			<span class="font-bold text-brown">Created Time</span>
 			<Input
 				type="text"
-				name="inspection_station_id"
-				placeholder="station0"
-				value={accountData?.inspection_station_id}
+				name="createdAt"
+				placeholder="Monday, Jun 20, 2020, 20:20:20 AM"
+				class="!text-brown font-medium"
+				value={userData?.createdAt ? formatDate(userData?.createdAt) : ''}
+				readonly
 			/>
 		</Label>
+		<Label class="space-y-2 mb-2">
+			<span class="font-bold text-brown">Last Update</span>
+			<Input
+				type="text"
+				name="updatedAt"
+				placeholder="Monday, Jun 20, 2020, 20:20:20 AM"
+				class="!text-brown font-medium"
+				value={userData?.updatedAt ? formatDate(userData?.updatedAt) : ''}
+				readonly
+			/>
+		</Label>
+		<Label class="space-y-2 mb-2">
+			<span class="font-bold text-brown">Inspection Station ID</span>
+			<Input
+				type="text"
+				name="inspectionStationId"
+				placeholder="An id number here..."
+				class="!text-brown font-medium"
+				value={userData?.inspectionStation?.id}
+				readonly
+			/>
+		</Label>
+		<Label class="space-y-2 mb-2">
+			<span class="font-bold text-brown">Inspection Station Name</span>
+			<Input
+				type="text"
+				name="inspectionStationName"
+				placeholder="Sample Station Name here..."
+				class="!text-brown font-medium"
+				value={userData?.inspectionStation?.stationName}
+				readonly
+			/>
+		</Label>
+
+		<Button type="submit" color="red" class="mt-4">Sign out</Button>
 	</form>
-
-	<Button 
-		color="red" 
-		class="mt-4" 
-		on:click={() => {
-			localStorage.removeItem('loggedIn')
-			localStorage.removeItem('role')
-			localStorage.removeItem('username')
-
-			goto('/login')
-		}}
-	>
-		Sign out
-	</Button>
 </div>
