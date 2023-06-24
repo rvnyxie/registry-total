@@ -11,23 +11,13 @@
 		Chevron
 	} from 'flowbite-svelte';
 	import { Footer, FooterLinkGroup, FooterLink } from 'flowbite-svelte';
-	import { goto } from '$app/navigation';
 	import { afterUpdate, onMount } from 'svelte';
 	import { page } from '$app/stores';
 
 	// Holy, we need to import to make image work??
 	import logo from '$lib/assets/logo.png';
 
-	let role: string = '';
-	// there's a bug here, if not put this in onMount, will get 500 error (ask gpt for more)
-	onMount(() => {
-		let loggedIn = localStorage.getItem('loggedIn') ?? '';
-		role = localStorage.getItem('role') ?? '';
-
-		if (!loggedIn) {
-			goto('/login');
-		}
-	});
+	let role: string = 'admin';
 
 	let currentPath = '';
 	let carPathExtraInfo = '';

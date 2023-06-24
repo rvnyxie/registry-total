@@ -1,9 +1,10 @@
-<script>
+<script lang="ts">
 	import { enhance } from '$app/forms';
+	import type { ActionData } from './$types';
 
 	import logo from '$lib/assets/logo.png';
 
-	export let form;
+	export let form: ActionData;
 
 	let signupDesire = false;
 	let forgotPasswordDesire = false;
@@ -98,9 +99,11 @@
 							Please refer to admin for more information!
 						</p>
 					{/if}
-					<!-- form prop data exist after form submits, there's a property named "error" -->
-					{#if form?.credentials}
-						<p class="text-error_red visible">Invalid username or password!</p>
+					{#if form?.invalid}
+						<p class="text-error_red">Username and password is required!</p>
+					{/if}
+					{#if form?.credentialsError}
+						<p class="text-error_red">Invalid username or password!</p>
 					{/if}
 				</div>
 			</div>
