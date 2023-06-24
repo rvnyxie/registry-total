@@ -1,6 +1,6 @@
 # RegistryTotal Project
 Registration Management System<br>  
-RegistryTotal is a web application developed to support the Vehicle Registration Department and inspection centers nationwide in managing vehicle inspections for automobiles.<br>
+RegistryTotal is a web application developed to support the Vehicle Registration Department and inspection centers nationwide in managing vehicle inspections for automobiles.<br><br>
 Here is the [Figma design](https://www.figma.com/file/gMfg7f2zmkh2htwS3nbNgu/RegistryTotal-Design?type=design&node-id=0%3A1&mode=design&t=Y0UUur5GRfDrIUBv-1) for this project. This is used as a sample for the development and the final product can be a bit different.
 
 ## Technology used:
@@ -12,6 +12,8 @@ Here is the [Figma design](https://www.figma.com/file/gMfg7f2zmkh2htwS3nbNgu/Reg
 - Database: Sqlite (with the support of Prisma). Here is [the design](https://drive.google.com/file/d/1mZW18g7-S2kMsiV3-fFJsAKn7yUjEkik/view?usp=sharing) of database.
 
 ## Features
+- Authentication and authorization with JWT
+- Role and permisson based route
 
 ## Guides to install
 
