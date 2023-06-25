@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { enhance } from '$app/forms';
-	import { goto } from '$app/navigation';
+	import { applyAction, enhance } from '$app/forms';
+	import { invalidateAll } from '$app/navigation';
 	import { Label, Input, Button, Modal } from 'flowbite-svelte';
 	import {
 		Table,
@@ -11,106 +11,85 @@
 		TableHeadCell,
 		Checkbox
 	} from 'flowbite-svelte';
-	import { onMount, afterUpdate } from 'svelte';
 
-	export let form
-	export let data
+	import { formatDate } from '$lib/helpers/format';
+	import { afterUpdate } from 'svelte';
 
-	type userType = {
-		user_id: number;
-		username: string;
-		password: string;
-		is_admin: boolean;
-		email?: string;
-		created_time?: string;
-		last_update?: string;
-		inspection_station_id?: string;
-	};
+	export let form;
+	export let data;
 
-	// assign value early to prevent 500 error
-	// get value from local storage too soon give 500 error
-	let accounts: userType[] = data.accountsData
-	let role = data.role
+	let accounts = data.accounts;
 
-	if (role === 'not_admin') {
-		goto('/')
-	}
+	// auto update accounts in table whenever data.accounts (returned from server load function) changes
+	// The data.accounts will change when we create, edit or delete
+	$: accounts = data.accounts;
 
-	console.log(accounts);
+	// Create a variable with type of account but all properties are optional
+	let currentEditingAccount: Partial<(typeof accounts)[number]> = {};
 
-	onMount(() => {		
-	});
+	// Variables responsible for modal showing
+	let creatingAccount = false;
+	let editingAccount = false;
+	let deletingAccount = false;
 
-	afterUpdate(() => {
-		// handle form add and edit
-		if (form?.changeStatus && form?.user_id) {
-			const receivedAccount: userType = {
-				user_id: parseInt(form.user_id),
-				username: form.username,
-				password: form.password,
-				is_admin: Boolean(form.is_admin === 'yes' ? 'true' : ''),
-				email: form.email,
-				created_time: form.created_time,
-				last_update: form.last_update,
-				inspection_station_id: form.inspection_station_id
-			};
+	// Variables responsible for checkboxes functions to work
+	let selectedAccounts: number[] = [];
+	let isTableHeadChecked = false;
+	let isAllTableRowChecked = false;
+	$: totalAccounts = accounts.length;
 
-			if (form?.action_type === 'add_user') {
-				accounts = [...accounts, receivedAccount];
-			} else if (form?.action_type === 'edit_user') {
-				const updatedAccounts = accounts.map((account) => {
-					if (account.user_id === receivedAccount.user_id) {
-						return receivedAccount;
-					}
-				}) as userType[];
+	// Variables responsible for notifications states
+	let successfulCreating = false;
+	let successfulDeleting = false;
+	let successfulEditing = false;
+	let successfulCancel = false;
 
-				accounts = updatedAccounts;
+	// Update state for notifications when operate on table
+	$: {
+		if (form?.status === 'success') {
+			if (form?.action === 'create') {
+				successfulCreating = true;
+			} else if (form?.action === 'delete') {
+				successfulDeleting = true;
+			} else if (form?.action === 'edit') {
+				successfulEditing = true;
 			}
 
-			// update local storage
-			localStorage.setItem('accounts', JSON.stringify(accounts));
+			setTimeout(() => {
+				successfulCreating = false;
+				successfulDeleting = false;
+				successfulEditing = false;
 
-			form.changeStatus = false;
-
-			console.log(accounts);
+				if (form) {
+					form.status = '';
+					form.action = '';
+				}
+			}, 2000);
 		}
+	}
 
-		// handle form delete
-		if (form?.deleteStatus && form?.user_id) {
-			const indexOfDeletedUser = accounts.findIndex(
-				(user) => user.user_id.toString() === form?.user_id
-			);
-			accounts.splice(indexOfDeletedUser, 1);
+	// Update accounts based on results matched the search query
+	$: {
+		if (form?.status === 'success' && form?.action === 'search') {
+			const matchedUsersId = form?.matchedUsersId;
 
-			// update local storage
-			localStorage.setItem('accounts', JSON.stringify(accounts));
+			accounts = accounts.filter((account) => {
+				return matchedUsersId?.includes(account.id);
+			});
 
-			form.deleteStatus = false;
+			if (form) {
+				form.status = '';
+				form.action = '';
+			}
 		}
-	});
-
-	let newAndEditFormModal = false;
-	let deleteFormModal = false;
-
-	let currentEditingAccount: {
-		user_id?: any;
-		username?: string;
-		password?: string;
-		is_admin?: boolean;
-		email?: string | undefined;
-		created_time?: string | undefined;
-		last_update?: string | undefined;
-		inspection_station_id?: string | undefined;
-	};
-
-	let listOfSelectedUser: number[] = [];
+	}
 </script>
 
 <div class="w-1/2 bg-primary_color">
-	<form method="POST" class="bg-secondary_color" use:enhance>
+	<form method="POST" action="?/search" class="bg-secondary_color" use:enhance>
 		<Label for="search" class="" />
 		<Input
-			name="search"
+			name="searchQuery"
 			id="search"
 			placeholder="Enter your text here"
 			size="md"
@@ -139,36 +118,88 @@
 			</Button>
 		</Input>
 	</form>
+
+	{#if form?.status === 'success' || successfulCancel}
+		<div class="text-sm absolute right-14 top-16">
+			<div class="flex flex-col gap-4">
+				{#if form?.status === 'success'}
+					{#if form?.action === 'create'}
+						<div>
+							<p class="text-sm p-2 bg-light_green text-brown font-bold rounded-lg">
+								Created Successful!
+							</p>
+						</div>
+					{:else if form?.action === 'delete'}
+						<div>
+							<p class="text-sm p-2 bg-light_green text-brown font-bold rounded-lg">
+								Deleted Successful!
+							</p>
+						</div>
+					{:else if form?.action === 'edit'}
+						<div>
+							<p class="text-sm p-2 bg-light_green text-brown font-bold rounded-lg">
+								Editted Successful!
+							</p>
+						</div>
+					{/if}
+				{/if}
+
+				{#if successfulCancel}
+					<div>
+						<p
+							class="text-sm p-2 px-6 text-center bg-error_red text-light_yellow font-bold rounded-lg"
+						>
+							Canceled!
+						</p>
+					</div>
+				{/if}
+			</div>
+		</div>
+	{/if}
 </div>
 
 <div class="grow w-4/5 rounded-xl p-4 bg-gray-50 overflow-scroll">
-	<div class="flex justify-end">
-		{#if listOfSelectedUser.length >= 1}
-			<Button
-				class="mb-2"
-				size="xs"
-				on:click={() => {
-					deleteFormModal = true;
-				}}
-			>
-				Delete Selected
-			</Button>
-		{/if}
+	<div class="flex justify-between flex-row-reverse">
 		<Button
 			class="mb-2"
 			size="xs"
 			on:click={() => {
-				newAndEditFormModal = true;
+				creatingAccount = true;
 				currentEditingAccount = {};
 			}}
 		>
 			New
 		</Button>
+		{#if selectedAccounts.length > 1}
+			<Button
+				class="mb-2"
+				size="xs"
+				on:click={() => {
+					deletingAccount = true;
+				}}
+			>
+				Delete Selected
+			</Button>
+		{/if}
 	</div>
 	<Table hoverable={true} striped={true} color="default">
 		<TableHead class="bg-gray-200">
 			<TableHeadCell class="!p-4">
-				<Checkbox />
+				<Checkbox
+					checked={isAllTableRowChecked}
+					on:click={() => {
+						// if checked = true, all the accounts need to be checked
+						isTableHeadChecked = !isTableHeadChecked;
+
+						// when TableHead is checked, add all accounts id to selectedAccounts list
+						// reset selectedAccounts when uncheck
+						if (isTableHeadChecked) {
+							selectedAccounts = accounts.map((account) => account.id);
+						} else {
+							selectedAccounts = [];
+						}
+					}}
+				/>
 			</TableHeadCell>
 			<TableHeadCell>User ID</TableHeadCell>
 			<TableHeadCell>Username</TableHeadCell>
@@ -187,37 +218,50 @@
 			</TableHeadCell>
 		</TableHead>
 		<TableBody>
-			{#each accounts as account}
+			{#each accounts as account, rowIndex}
 				<TableBodyRow>
 					<TableBodyCell class="!p-4">
 						<Checkbox
+							checked={isTableHeadChecked}
 							on:click={() => {
-								const index = listOfSelectedUser.findIndex(
-									(user_id) => (account.user_id = user_id)
-								);
-
-								if (index === -1) {
-									listOfSelectedUser = [...listOfSelectedUser, account.user_id];
+								// if account.id is in selectedAccounts, remove it
+								// else add it
+								// note: reactivity in svelte is triggered by assignment
+								if (selectedAccounts.includes(account.id)) {
+									selectedAccounts = selectedAccounts.filter((id) => account.id !== id);
 								} else {
-									listOfSelectedUser.splice(index, 1);
+									selectedAccounts = [...selectedAccounts, account.id];
+								}
+
+								// if all accounts are checked, then checkbox in TableHead is checked
+								if (selectedAccounts.length === totalAccounts) {
+									isAllTableRowChecked = true;
+								} else {
+									isAllTableRowChecked = false;
 								}
 							}}
 						/>
 					</TableBodyCell>
-					<TableBodyCell>{account?.user_id}</TableBodyCell>
+					<TableBodyCell>{account?.id}</TableBodyCell>
 					<TableBodyCell>{account?.username}</TableBodyCell>
 					<TableBodyCell>{account?.password}</TableBodyCell>
-					<TableBodyCell>{account?.is_admin}</TableBodyCell>
+					<TableBodyCell>{account?.isAdmin}</TableBodyCell>
 					<TableBodyCell>{account?.email}</TableBodyCell>
-					<TableBodyCell>{account?.created_time}</TableBodyCell>
-					<TableBodyCell>{account?.last_update}</TableBodyCell>
-					<TableBodyCell>{account?.inspection_station_id}</TableBodyCell>
+					<TableBodyCell>{account?.createdAt ? formatDate(account.createdAt) : ''}</TableBodyCell>
+					<TableBodyCell>{account?.updatedAt ? formatDate(account.updatedAt) : ''}</TableBodyCell>
+					<TableBodyCell
+						>{account?.inspectionStationId
+							? account.inspectionStationId
+							: account?.isAdmin
+							? 'All'
+							: 'None'}</TableBodyCell
+					>
 					<TableBodyCell>
 						<Button
 							size="xs"
 							color="dark"
 							on:click={() => {
-								newAndEditFormModal = true;
+								editingAccount = true;
 								currentEditingAccount = account;
 							}}
 						>
@@ -227,7 +271,7 @@
 							size="xs"
 							color="red"
 							on:click={() => {
-								deleteFormModal = true;
+								deletingAccount = true;
 								currentEditingAccount = account;
 							}}
 						>
@@ -238,17 +282,99 @@
 			{/each}
 		</TableBody>
 
-		<Modal bind:open={newAndEditFormModal} outsideclose={true} size="md" class="w-full">
-			<form method="POST" action="?/changeUser" use:enhance>
+		<!-- New Modal -->
+		<Modal bind:open={creatingAccount} outsideclose={true} size="md" class="w-full">
+			<form
+				method="POST"
+				action="?/addAccount"
+				use:enhance={() => {
+					return async ({ result }) => {
+						invalidateAll();
+						creatingAccount = false;
+
+						await applyAction(result);
+					};
+				}}
+			>
+				<Label class="space-y-2">
+					<span>Username</span>
+					<Input type="text" name="username" placeholder="username" required />
+				</Label>
+				<Label class="space-y-2">
+					<span>Password</span>
+					<Input type="password" name="password" placeholder="•••••" required />
+				</Label>
+				<Label class="space-y-2">
+					<span>Is admin</span>
+					<Input type="text" name="isAdmin" placeholder="yes/no" required />
+				</Label>
+				<Label class="space-y-2">
+					<span>Email</span>
+					<Input type="email" name="email" placeholder="name@company.com" required />
+				</Label>
+
+				<Label class="space-y-2">
+					<span>Inspection Station ID</span>
+					<Input type="text" name="inspectionStationId" placeholder="Input station ID here..." />
+				</Label>
+
+				<div class="flex flex-row items-center justify-center">
+					<Button
+						type="button"
+						color="red"
+						on:click={() => {
+							creatingAccount = false;
+							successfulCancel = true;
+
+							// Turn off state to close notification
+							setTimeout(() => {
+								successfulCancel = false;
+							}, 2000);
+						}}>Cancel</Button
+					>
+					<Button
+						type="submit"
+						class="my-4 rounded-xl bg-light_green text-[#675D50] hover:bg-orange hover:text-white m-2"
+						color="none">Add</Button
+					>
+				</div>
+
+				{#if form?.status === 'failed' && form?.invalidData}
+					<p class="text-base text-error_red font-semibold text-center">{form?.message}</p>
+				{/if}
+
+				{#if form?.status === 'success'}
+					<p class="text-base text-[#00b300] font-semibold text-center">{form?.message}</p>
+				{/if}
+			</form>
+		</Modal>
+
+		<!-- Edit Modal -->
+		<Modal bind:open={editingAccount} outsideclose={true} size="md" class="w-full">
+			<form
+				method="POST"
+				action="?/editAccount"
+				use:enhance={() => {
+					return async ({ result }) => {
+						invalidateAll();
+						editingAccount = false;
+
+						await applyAction(result);
+					};
+				}}
+			>
 				<Label class="space-y-2">
 					<span>User ID</span>
 					<Input
 						type="text"
-						name="user_id"
-						placeholder="a number"
-						value={currentEditingAccount?.user_id}
+						name="id"
+						placeholder="User ID..."
+						value={currentEditingAccount?.id}
+						readonly
+						color="green"
 					/>
 				</Label>
+
 				<Label class="space-y-2">
 					<span>Username</span>
 					<Input
@@ -272,9 +398,9 @@
 					<span>Is admin</span>
 					<Input
 						type="text"
-						name="is_admin"
+						name="isAdmin"
 						placeholder="yes/no"
-						value={currentEditingAccount?.is_admin}
+						value={currentEditingAccount?.isAdmin}
 						required
 					/>
 				</Label>
@@ -287,65 +413,80 @@
 						value={currentEditingAccount?.email}
 					/>
 				</Label>
+
 				<Label class="space-y-2">
 					<span>Created Time</span>
 					<Input
-						type="date"
-						name="created_time"
-						placeholder="2023-06-01"
-						value={currentEditingAccount?.created_time}
+						type="text"
+						name="createdAt"
+						placeholder="Sat, June 20, 2020 at 20:20 AM"
+						value={currentEditingAccount?.createdAt
+							? formatDate(currentEditingAccount?.createdAt)
+							: ''}
+						readonly
+						color="green"
 					/>
 				</Label>
 				<Label class="space-y-2">
 					<span>Last Update</span>
 					<Input
-						type="date"
-						name="last_update"
-						placeholder="2023-06-15"
-						value={currentEditingAccount?.last_update}
+						type="text"
+						name="updatedAt"
+						placeholder="Sat, June 21, 2021 at 21:21 AM"
+						value={currentEditingAccount?.updatedAt
+							? formatDate(currentEditingAccount?.updatedAt)
+							: ''}
+						readonly
+						color="green"
 					/>
 				</Label>
 				<Label class="space-y-2">
 					<span>Inspection Station ID</span>
 					<Input
 						type="text"
-						name="inspection_station_id"
-						placeholder="station0"
-						value={currentEditingAccount?.inspection_station_id}
+						name="inspectionStationId"
+						placeholder="Input station ID here..."
+						value={currentEditingAccount?.inspectionStationId}
 					/>
 				</Label>
 
 				<div class="flex flex-row items-center justify-center">
-					<!-- currentEditingAccount is modified based on which button user click -->
-					{#if currentEditingAccount?.user_id === undefined}
-						<!-- Add new user -->
-						<Input type="text" name="action_type" value="add_user" class="hidden" />
-						<Button type="button" color="red" on:click={() => (newAndEditFormModal = false)}
-							>Cancel</Button
-						>
-						<Button
-							type="submit"
-							class="my-4 rounded-xl bg-light_green text-[#675D50] hover:bg-orange hover:text-white m-2"
-							color="none">Add</Button
-						>
-					{:else}
-						<!-- Edit user -->
-						<Input type="text" name="action_type" value="edit_user" class="hidden" />
-						<Button type="button" color="alternative" on:click={() => (newAndEditFormModal = false)}
-							>Cancel</Button
-						>
-						<Button
-							type="submit"
-							class="my-4 rounded-xl bg-light_green text-[#675D50] hover:bg-orange hover:text-white m-2"
-							color="red">Save</Button
-						>
-					{/if}
+					<Button
+						type="button"
+						color="alternative"
+						on:click={() => {
+							editingAccount = false;
+							successfulCancel = true;
+
+							// Turn off state to close notification
+							setTimeout(() => {
+								successfulCancel = false;
+							}, 2000);
+						}}>Cancel</Button
+					>
+					<Button
+						type="submit"
+						class="my-4 rounded-xl bg-light_green text-[#675D50] hover:bg-orange hover:text-white m-2"
+						color="red">Save</Button
+					>
 				</div>
 			</form>
 		</Modal>
 
-		<Modal bind:open={deleteFormModal} outsideclose={true} size="md" class="w-full">
-			<form method="POST" action="?/deleteUser" use:enhance>
+		<!-- Delete Modal -->
+		<Modal bind:open={deletingAccount} outsideclose={true} size="md" class="w-full">
+			<form
+				method="POST"
+				action="?/deleteAccount"
+				use:enhance={() => {
+					return async ({ result }) => {
+						invalidateAll();
+						deletingAccount = false;
+
+						await applyAction(result);
+					};
+				}}
+			>
 				<div class="text-center">
 					<svg
 						aria-hidden="true"
@@ -362,21 +503,49 @@
 						/></svg
 					>
 
-					{#if listOfSelectedUser.length > 1}
+					{#if selectedAccounts.length > 1}
 						<h3 class="mb-5 text-lg font-normal text-gray-500 dark:text-gray-400">
-							Are you sure you want to delete <strong>THESE</strong> accounts?
+							Are you sure you want to delete <strong>THESE</strong> selected accounts?
 						</h3>
+						<Input type="text" name="ids" class="hidden" value={selectedAccounts} />
+						<Button
+							type="button"
+							color="alternative"
+							on:click={() => {
+								deletingAccount = false;
+								successfulCancel = true;
+
+								// Turn off state to close notification
+								setTimeout(() => {
+									successfulCancel = false;
+								}, 2000);
+							}}>No, cancel</Button
+						>
+						<Button type="submit" color="red" class="mr-2" formaction="?/deleteManyAccounts"
+							>Yes, I'm sure</Button
+						>
 					{:else}
 						<h3 class="mb-5 text-lg font-normal text-gray-500 dark:text-gray-400">
 							Are you sure you want to delete this account?
 						</h3>
-					{/if}
+						<Input type="text" name="id" class="hidden" value={currentEditingAccount.id} />
+						<Button
+							type="button"
+							color="alternative"
+							on:click={() => {
+								deletingAccount = false;
+								successfulCancel = true;
 
-					<Input type="text" name="user_id" class="hidden" value={currentEditingAccount.user_id} />
-					<Button type="button" color="alternative" on:click={() => (deleteFormModal = false)}
-						>No, cancel</Button
-					>
-					<Button type="submit" color="red" class="mr-2">Yes, I'm sure</Button>
+								// Turn off state to close notification
+								setTimeout(() => {
+									successfulCancel = false;
+								}, 2000);
+							}}>No, cancel</Button
+						>
+						<Button type="submit" color="red" class="mr-2" formaction="?/deleteAccount"
+							>Yes, I'm sure</Button
+						>
+					{/if}
 				</div>
 			</form>
 		</Modal>

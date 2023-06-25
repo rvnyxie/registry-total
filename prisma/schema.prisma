@@ -76,7 +76,7 @@ model InspectionStation {
   stattionAdrress       String
   inspectionStationType String
   carInspection         CarInspection[]
-  user                  User[]
+  users                 User[]
 }
 
 model User {
@@ -88,5 +88,9 @@ model User {
   updatedAt           DateTime           @updatedAt
   isAdmin             Boolean            @default(false)
   inspectionStation   InspectionStation? @relation(fields: [inspectionStationId], references: [id])
-  inspectionStationId Int?               @unique
+  inspectionStationId Int?
+
+  // Noramlly, if we don't specify index, then Prisma will automatically create unique index on inspectionStationId
+  // If that happens, we can't connect 2 user to one Inspection Station!
+  @@index([id, username, inspectionStationId])
 }

@@ -4,23 +4,11 @@
 
 	import { Label, Input, Button } from 'flowbite-svelte';
 
+	import { formatDate } from '$lib/helpers/format';
+
 	export let data: PageData;
 
 	const userData = data.user;
-
-	function formatDate(date: Date) {
-		const options = {
-			weekday: 'long',
-			month: 'short',
-			day: 'numeric',
-			year: 'numeric',
-			hour: 'numeric',
-			minute: 'numeric',
-			second: 'numeric'
-		};
-
-		return date.toLocaleDateString('en-US', options);
-	}
 </script>
 
 <div class="grow w-4/5 rounded-xl p-4 bg-gray-50 overflow-scroll text-brown">
