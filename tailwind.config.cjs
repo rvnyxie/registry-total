@@ -28,6 +28,7 @@ const config = {
         error_red: '#A22828',
         light_green: '#C5E8C3',
         yellow: '#FAD592',
+        cool_blue: '#4FC0D0',
         primary: {
           50: '#FFF5F2',
           100: '#FFF1EE',

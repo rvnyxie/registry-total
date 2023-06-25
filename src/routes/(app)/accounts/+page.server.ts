@@ -3,7 +3,14 @@ import type { RequestEvent } from '@sveltejs/kit';
 import { error, fail, redirect } from '@sveltejs/kit'
 
 import db from '$lib/server/database'
-import bcrypt from 'bcrypt'
+import {
+    checkIfInspectionStationExisted,
+    checkIfUserIdExist,
+    checkIfUsernameAndEmailExist,
+    createNewAdminUser,
+    createNewNormalUser,
+    updateUser
+} from '$lib/server/helpers/user.operations';
 
 export const load: PageServerLoad = async ({ locals }) => {
     if (!locals.user) {
@@ -63,7 +70,6 @@ async function addAccount(event: RequestEvent) {
         }
 
         return { status: 'success', action: 'create', invalidData: false, message: 'Admin user created successfully!' }
-
     }
 
     // Create a new normal user
@@ -97,79 +103,8 @@ function checkValidFormSubmittedData(formData: { [k: string]: FormDataEntryValue
     return true
 }
 
-async function checkIfUsernameAndEmailExist(username: string, email: string) {
-    const user = await db.user.findMany({
-        where: {
-            OR: [
-                { username: username },
-                { email: email }
-            ]
-        }
-    })
-
-    // Empty array means truthy in JS
-    if (user.length === 0) {
-        return false
-    }
-
-    return true
-}
-
-
-async function createNewAdminUser(username: string, password: string, email: string) {
-    const newAdminUser = await db.user.create({
-        data: {
-            username: username,
-            password: await bcrypt.hash(password, 10),
-            email: email,
-            isAdmin: true,
-            createdAt: new Date(),
-        }
-    })
-
-    return newAdminUser
-}
-
-async function createNewNormalUser(username: string, password: string, email: string, inspectionStationId: string) {
-    const inspectionStationExist = await db.inspectionStation.findUnique({
-        where: { id: Number(inspectionStationId) }
-    })
-
-    let newNormalUser
-
-    if (inspectionStationExist) {
-        newNormalUser = await db.user.create({
-            data: {
-                username: username,
-                password: await bcrypt.hash(password, 10),
-                email: email,
-                isAdmin: false,
-                inspectionStation: {
-                    connect: {
-                        id: Number(inspectionStationId)
-                    }
-                }
-            }
-        })
-    } else {
-        newNormalUser = await db.user.create({
-            data: {
-                username: username,
-                password: await bcrypt.hash(password, 10),
-                email: email,
-                isAdmin: false,
-                inspectionStationId: null
-            }
-        })
-    }
-
-
-    return newNormalUser
-}
-
 async function editAccount(event: RequestEvent) {
     const formData = Object.fromEntries(await event.request.formData())
-    console.log(formData)
 
     const isFormDataValid = checkValidFormSubmittedData(formData)
 
@@ -194,39 +129,9 @@ async function editAccount(event: RequestEvent) {
             isAdminValue = true;
         }
 
-        const inspectionStationExist = await db.inspectionStation.findUnique({
-            where: { id: Number(inspectionStationId) }
-        })
+        const inspectionStationExist = await checkIfInspectionStationExisted(inspectionStationId)
 
-        if (!inspectionStationExist) {
-            await db.user.update({
-                where: { id: Number(id) },
-                data: {
-                    username: username,
-                    password: await bcrypt.hash(password, 10),
-                    email: email,
-                    isAdmin: isAdminValue,
-                    updatedAt: new Date(),
-                    inspectionStationId: null
-                }
-            })
-        } else {
-            await db.user.update({
-                where: { id: Number(id) },
-                data: {
-                    username: username,
-                    password: await bcrypt.hash(password, 10),
-                    email: email,
-                    isAdmin: isAdminValue,
-                    updatedAt: new Date(),
-                    inspectionStation: {
-                        connect: {
-                            id: Number(inspectionStationId)
-                        }
-                    }
-                }
-            })
-        }
+        await updateUser({ id, username, password, email, isAdminValue, inspectionStationId, inspectionStationExist })
 
         console.log('Updated successfully!')
 
@@ -237,19 +142,6 @@ async function editAccount(event: RequestEvent) {
     }
 
 }
-
-async function checkIfUserIdExist(id: number) {
-    const user = await db.user.findUnique({
-        where: { id: id }
-    })
-
-    if (!user) {
-        return false
-    }
-
-    return true
-}
-
 
 async function deleteAccount(event: RequestEvent) {
     const formData = await event.request.formData()
@@ -302,6 +194,7 @@ async function deleteManyAccounts(event: RequestEvent) {
 
         return { status: 'success', action: 'delete', invalidIds: false, message: 'Accounts deleted successfully!' }
     } else {
+
         return fail(400, { status: 'failed', action: 'delete', invalidIds: true, message: 'Something went wrong! Account Ids in not in correct formmat!' })
     }
 }
@@ -311,6 +204,7 @@ function checkValidAccountIds(deleteAccountIds: FormDataEntryValue | null) {
         console.error('Incorrect type of deleteAccountIds!')
         return false
     }
+
     return true
 }
 
