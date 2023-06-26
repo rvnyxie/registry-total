@@ -42,9 +42,6 @@ async function main() {
             email: 'long@mail.com',
             ownerType: 'personal',
             fullname: 'Nguyen Hoang Long',
-            companyName: '',
-            companyType: '',
-            typeOfBusiness: '',
         }
     })
     // Owner 2

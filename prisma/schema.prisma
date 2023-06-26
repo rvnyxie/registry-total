@@ -11,15 +11,15 @@ datasource db {
 }
 
 model Owner {
-  id             String @id
-  address        String
-  phoneNumber    String @unique
-  email          String @unique
-  ownerType      String
+  id             String  @id
   fullname       String
-  companyName    String
-  typeOfBusiness String
-  companyType    String
+  address        String
+  phoneNumber    String  @unique
+  email          String  @unique
+  ownerType      String
+  companyName    String?
+  typeOfBusiness String?
+  companyType    String?
   car            Car[]
 }
 

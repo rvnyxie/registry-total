@@ -38,39 +38,24 @@
 	let isAllTableRowChecked = false;
 	$: totalAccounts = accounts.length;
 
-	// Variables responsible for notifications states
-	let successfulCreating = false;
-	let successfulDeleting = false;
-	let successfulEditing = false;
+	// Variable responsible for notifications states
 	let successfulCancel = false;
 
 	// Update state for notifications when operate on table
 	$: {
 		if (form?.status === 'success') {
-			if (form?.action === 'create') {
-				successfulCreating = true;
-			} else if (form?.action === 'delete') {
-				successfulDeleting = true;
-			} else if (form?.action === 'edit') {
-				successfulEditing = true;
-			}
-
 			setTimeout(() => {
-				successfulCreating = false;
-				successfulDeleting = false;
-				successfulEditing = false;
-
 				if (form) {
 					form.status = '';
 					form.action = '';
 				}
-			}, 2000);
+			}, 3000);
 		}
 	}
 
 	// Update accounts based on results matched the search query
 	$: {
-		if (form?.status === 'success' && form?.action === 'search') {
+		if (form?.status === 'success' && form?.action === 'searchUser') {
 			const matchedUsersId = form?.matchedUsersId;
 
 			accounts = accounts.filter((account) => {
@@ -123,19 +108,19 @@
 		<div class="text-sm absolute right-14 top-16">
 			<div class="flex flex-col gap-4">
 				{#if form?.status === 'success'}
-					{#if form?.action === 'create'}
+					{#if form?.action === 'createUser'}
 						<div>
 							<p class="text-sm p-2 bg-light_green text-brown font-bold rounded-lg">
 								Created Successful!
 							</p>
 						</div>
-					{:else if form?.action === 'delete'}
+					{:else if form?.action === 'deleteUser'}
 						<div>
 							<p class="text-sm p-2 bg-light_green text-brown font-bold rounded-lg">
 								Deleted Successful!
 							</p>
 						</div>
-					{:else if form?.action === 'edit'}
+					{:else if form?.action === 'editUser'}
 						<div>
 							<p class="text-sm p-2 bg-light_green text-brown font-bold rounded-lg">
 								Editted Successful!
@@ -289,9 +274,10 @@
 				action="?/addAccount"
 				use:enhance={() => {
 					return async ({ result }) => {
-						invalidateAll();
-						creatingAccount = false;
-
+						if (result.status === 200) {
+							invalidateAll();
+							creatingAccount = false;
+						}
 						await applyAction(result);
 					};
 				}}
@@ -356,9 +342,10 @@
 				action="?/editAccount"
 				use:enhance={() => {
 					return async ({ result }) => {
-						invalidateAll();
-						editingAccount = false;
-
+						if (result.status === 200) {
+							invalidateAll();
+							editingAccount = false;
+						}
 						await applyAction(result);
 					};
 				}}
@@ -480,9 +467,10 @@
 				action="?/deleteAccount"
 				use:enhance={() => {
 					return async ({ result }) => {
-						invalidateAll();
-						deletingAccount = false;
-
+						if (result.status === 200) {
+							invalidateAll();
+							deletingAccount = false;
+						}
 						await applyAction(result);
 					};
 				}}

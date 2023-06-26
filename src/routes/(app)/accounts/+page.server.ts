@@ -65,7 +65,7 @@ async function addAccount(event: RequestEvent) {
     const isUsernameOrEmailExisted = await checkIfUsernameAndEmailExist(username, email)
     if (isUsernameOrEmailExisted) {
         console.error('Could not create user! Username or email is existed!')
-        return fail(400, { status: 'failed', action: 'create', invalidData: true, message: 'Could not create user! Username or email is existed!' })
+        return fail(400, { status: 'failed', action: 'createUser', invalidData: true, message: 'Could not create user! Username or email is existed!' })
     }
 
     // Create a new admin user
@@ -74,10 +74,10 @@ async function addAccount(event: RequestEvent) {
 
         if (!newAdminUser) {
             console.error('Could not create admin user! Username or password or email is existed!')
-            return fail(400, { status: 'failed', invalidData: true, message: 'Could not create admin user! Username or password or email is existed!' })
+            return fail(400, { status: 'failed', action: 'createUser', invalidData: true, message: 'Could not create admin user! Username or password or email is existed!' })
         }
 
-        return { status: 'success', action: 'create', invalidData: false, message: 'Admin user created successfully!' }
+        return { status: 'success', action: 'createUser', invalidData: false, message: 'Admin user created successfully!' }
     }
 
     // Create a new normal user
@@ -85,10 +85,10 @@ async function addAccount(event: RequestEvent) {
 
     if (!newNormalUser) {
         console.error('Could not create normal user!')
-        return fail(400, { status: 'failed', action: 'create', invalidData: true, message: 'Could not create normal user! Username or password or email may exist!' })
+        return fail(400, { status: 'failed', action: 'createUser', invalidData: true, message: 'Could not create normal user! Username or password or email may exist!' })
     }
 
-    return { status: 'success', action: 'create', invalidData: false, message: 'Admin user created successfully!' }
+    return { status: 'success', action: 'createUser', invalidData: false, message: 'Admin user created successfully!' }
 
 }
 
@@ -125,7 +125,7 @@ async function editAccount(event: RequestEvent) {
     const isFormDataValid = checkValidFormSubmittedData(formData)
 
     if (!isFormDataValid) {
-        return fail(400, { status: 'failed', action: 'edit', invalidEditedData: true, message: 'Your updated data is invalid values! Try again!' })
+        return fail(400, { status: 'failed', action: 'editUser', invalidEditedData: true, message: 'Your updated data is invalid values! Try again!' })
     }
 
     const { id, username, password, email, isAdmin, inspectionStationId } =
@@ -136,7 +136,7 @@ async function editAccount(event: RequestEvent) {
     // Maybe we need to do something to prevent that. But not today...
 
     if (!isUserIdExisted) {
-        return fail(400, { status: 'failed', action: 'edit', invalidEditedData: true, message: 'Can not find the user! Try again!' })
+        return fail(400, { status: 'failed', action: 'editUser', invalidEditedData: true, message: 'Can not find the user! Try again!' })
     }
 
     try {
@@ -151,10 +151,10 @@ async function editAccount(event: RequestEvent) {
 
         console.log('Updated successfully!')
 
-        return { status: 'success', action: 'edit', invalidEditedData: false, message: 'Updated successfully!' }
+        return { status: 'success', action: 'editUser', invalidEditedData: false, message: 'Updated successfully!' }
     } catch (error) {
         console.error(error)
-        return fail(400, { status: 'failed', action: 'edit', invalidEditedData: true, message: 'Username or email may be taken or inspection station id is incorrect! Try again!' })
+        return fail(400, { status: 'failed', action: 'editUser', invalidEditedData: true, message: 'Username or email may be taken or inspection station id is incorrect! Try again!' })
     }
 
 }
@@ -177,7 +177,7 @@ async function deleteAccount(event: RequestEvent) {
     })
 
     if (!user) {
-        return fail(400, { status: 'failed', action: 'delete', invalidId: true, message: 'Something went wrong! Unable to find the account to delete' })
+        return fail(400, { status: 'failed', action: 'deleteUser', invalidId: true, message: 'Something went wrong! Unable to find the account to delete' })
     }
 
     const deletedAccount = await db.user.delete({
@@ -185,10 +185,10 @@ async function deleteAccount(event: RequestEvent) {
     })
 
     if (!deletedAccount) {
-        return fail(400, { status: 'failed', action: 'delete', invalidId: true, message: 'Something went wrong! Unable to delete the account' })
+        return fail(400, { status: 'failed', action: 'deleteUser', invalidId: true, message: 'Something went wrong! Unable to delete the account' })
     }
 
-    return { status: 'success', action: 'delete', invalidId: false, message: 'Account deleted successfully!' }
+    return { status: 'success', action: 'deleteUser', invalidId: false, message: 'Account deleted successfully!' }
 }
 
 async function deleteManyAccounts(event: RequestEvent) {
@@ -221,13 +221,13 @@ async function deleteManyAccounts(event: RequestEvent) {
         })
 
         if (deleteUsers.count === 0) {
-            return fail(400, { status: 'failed', action: 'delete', invalidIds: true, message: 'Something went wrong! Unable to delete the accounts' })
+            return fail(400, { status: 'failed', action: 'deleteUser', invalidIds: true, message: 'Something went wrong! Unable to delete the accounts' })
         }
 
-        return { status: 'success', action: 'delete', invalidIds: false, message: 'Accounts deleted successfully!' }
+        return { status: 'success', action: 'deleteUser', invalidIds: false, message: 'Accounts deleted successfully!' }
     } else {
 
-        return fail(400, { status: 'failed', action: 'delete', invalidIds: true, message: 'Something went wrong! Account Ids in not in correct formmat!' })
+        return fail(400, { status: 'failed', action: 'deleteUser', invalidIds: true, message: 'Something went wrong! Account Ids in not in correct formmat!' })
     }
 }
 
@@ -273,5 +273,5 @@ async function search(event: RequestEvent) {
 
     console.log(matchedUsers)
 
-    return { status: 'success', action: 'search', matchedUsersId }
+    return { status: 'success', action: 'searchUser', matchedUsersId }
 }
