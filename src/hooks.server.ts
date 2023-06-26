@@ -24,7 +24,7 @@ export const handle: Handle = async ({ event, resolve }) => {
             })
 
             if (!user) {
-                throw new Error('User not found')
+                throw new Error('User not found!')
             }
 
             event.locals.user = {

@@ -44,6 +44,14 @@ export const actions: Actions = {
 }
 
 async function addAccount(event: RequestEvent) {
+    if (!event.locals.user) {
+        throw redirect(302, '/login')
+    }
+
+    if (!event.locals.user.isAdmin) {
+        throw error(401, 'You must be an administrator to add an account!')
+    }
+
     const formData = Object.fromEntries(await event.request.formData());
     const isFormDataValid = checkValidFormSubmittedData(formData)
 
@@ -104,6 +112,14 @@ function checkValidFormSubmittedData(formData: { [k: string]: FormDataEntryValue
 }
 
 async function editAccount(event: RequestEvent) {
+    if (!event.locals.user) {
+        throw redirect(302, '/login')
+    }
+
+    if (!event.locals.user.isAdmin) {
+        throw error(401, 'You must be an administrator to edit an account!')
+    }
+
     const formData = Object.fromEntries(await event.request.formData())
 
     const isFormDataValid = checkValidFormSubmittedData(formData)
@@ -144,6 +160,14 @@ async function editAccount(event: RequestEvent) {
 }
 
 async function deleteAccount(event: RequestEvent) {
+    if (!event.locals.user) {
+        throw redirect(302, '/login')
+    }
+
+    if (!event.locals.user.isAdmin) {
+        throw error(401, 'You must be an administrator to delete an account!')
+    }
+
     const formData = await event.request.formData()
 
     const deleteAccountId = formData.get('id')
@@ -168,6 +192,14 @@ async function deleteAccount(event: RequestEvent) {
 }
 
 async function deleteManyAccounts(event: RequestEvent) {
+    if (!event.locals.user) {
+        throw redirect(302, '/login')
+    }
+
+    if (!event.locals.user.isAdmin) {
+        throw error(401, 'You must be an administrator to delete these accounts!')
+    }
+
     const formData = await event.request.formData()
 
     const rawDeleteAccountIds = formData.get('ids') // format is `1,2,3,4`
@@ -209,6 +241,14 @@ function checkValidAccountIds(deleteAccountIds: FormDataEntryValue | null) {
 }
 
 async function search(event: RequestEvent) {
+    if (!event.locals.user) {
+        throw redirect(302, '/login')
+    }
+
+    if (!event.locals.user.isAdmin) {
+        throw error(401, 'You must be an administrator to access this data!')
+    }
+
     const formData = await event.request.formData();
 
     const searchQuery = String(formData.get('searchQuery'))

@@ -16,7 +16,7 @@ model Owner {
   phoneNumber    String @unique
   email          String @unique
   ownerType      String
-  fullName       String
+  fullname       String
   companyName    String
   typeOfBusiness String
   companyType    String
