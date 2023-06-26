@@ -120,6 +120,12 @@
 								Deleted Successful!
 							</p>
 						</div>
+					{:else if form?.action === 'deleteManyUsers'}
+						<div>
+							<p class="text-sm p-2 bg-light_green text-brown font-bold rounded-lg">
+								Deleted Successful!
+							</p>
+						</div>
 					{:else if form?.action === 'editUser'}
 						<div>
 							<p class="text-sm p-2 bg-light_green text-brown font-bold rounded-lg">

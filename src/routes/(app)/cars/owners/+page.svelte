@@ -118,6 +118,12 @@
 								Deleted Successful!
 							</p>
 						</div>
+					{:else if form?.action === 'deleteManyOwners'}
+						<div>
+							<p class="text-sm p-2 bg-light_green text-brown font-bold rounded-lg">
+								Deleted Successful!
+							</p>
+						</div>
 					{:else if form?.action === 'editOwner'}
 						<div>
 							<p class="text-sm p-2 bg-light_green text-brown font-bold rounded-lg">

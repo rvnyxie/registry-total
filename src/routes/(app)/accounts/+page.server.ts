@@ -221,13 +221,13 @@ async function deleteManyAccounts(event: RequestEvent) {
         })
 
         if (deleteUsers.count === 0) {
-            return fail(400, { status: 'failed', action: 'deleteUser', invalidIds: true, message: 'Something went wrong! Unable to delete the accounts' })
+            return fail(400, { status: 'failed', action: 'deleteManyUsers', invalidIds: true, message: 'Something went wrong! Unable to delete the accounts' })
         }
 
-        return { status: 'success', action: 'deleteUser', invalidIds: false, message: 'Accounts deleted successfully!' }
+        return { status: 'success', action: 'deleteManyUsers', invalidIds: false, message: 'Accounts deleted successfully!' }
     } else {
 
-        return fail(400, { status: 'failed', action: 'deleteUser', invalidIds: true, message: 'Something went wrong! Account Ids in not in correct formmat!' })
+        return fail(400, { status: 'failed', action: 'deleteManyUsers', invalidIds: true, message: 'Something went wrong! Account Ids in not in correct formmat!' })
     }
 }
 

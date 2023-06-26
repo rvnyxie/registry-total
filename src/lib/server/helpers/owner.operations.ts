@@ -34,7 +34,7 @@ export async function checkIfOnlyOneOwnerMatch(id: string, phoneNumber: string, 
     return true
 }
 
-export async function searchOwnersMatchWithQuery(searchQuery: string) {
+export async function searchOwnersMatchedWithQuery(searchQuery: string) {
     return await db.owner.findMany({
         where: {
             OR: [

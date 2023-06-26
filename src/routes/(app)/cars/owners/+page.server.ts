@@ -5,7 +5,7 @@ import db from '$lib/server/database'
 import {
     checkIfIdOrPhonenumbeOrEmailExisted,
     checkIfOnlyOneOwnerMatch,
-    searchOwnersMatchWithQuery
+    searchOwnersMatchedWithQuery
 } from '$lib/server/helpers/owner.operations'
 
 export const load: PageServerLoad = async ({ locals }) => {
@@ -273,15 +273,11 @@ async function searchOwners(event: RequestEvent) {
         throw redirect(302, '/login')
     }
 
-    if (!event.locals.user.isAdmin) {
-        throw error(401, 'You are not authorized to access these data!')
-    }
-
     const formData = await event.request.formData()
 
     const searchQuery = String(formData.get('searchQuery'))
 
-    const matchedOwners = await searchOwnersMatchWithQuery(searchQuery)
+    const matchedOwners = await searchOwnersMatchedWithQuery(searchQuery)
 
     const matchedOwnerIds: string[] = []
     matchedOwners.forEach(owner => matchedOwnerIds.push(owner.id))

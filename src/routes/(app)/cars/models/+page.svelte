@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { enhance } from '$app/forms';
-	import { goto } from '$app/navigation';
+	import { applyAction, enhance } from '$app/forms';
+	import { invalidateAll } from '$app/navigation';
 	import { Label, Input, Button, Modal } from 'flowbite-svelte';
 	import {
 		Table,
@@ -11,139 +11,68 @@
 		TableHeadCell,
 		Checkbox
 	} from 'flowbite-svelte';
-	import { onMount, afterUpdate } from 'svelte';
 
 	export let form;
+	export let data;
 
-	type modelType = {
-		car_model_id: string;
-		car_model_name: string;
-		manufacturer: string;
-		version: string;
-		engine_type: string;
-		fuel_type: string;
-		transmission_type: string;
-		horsepower: string;
-		torque: string;
-		seating_capacity: number;
-	};
+	let carModels = data.carModels;
 
-	const default_models: modelType[] = [
-		{
-			car_model_id: '1',
-			car_model_name: 'Model 1',
-			manufacturer: 'Toyota',
-			version: '1.0',
-			engine_type: 'V6',
-			fuel_type: 'Gasoline',
-			transmission_type: 'Automatic',
-			horsepower: '300',
-			torque: '280',
-			seating_capacity: 5
-		},
-		{
-			car_model_id: '2',
-			car_model_name: 'Model 2',
-			manufacturer: 'Honda',
-			version: '2.0',
-			engine_type: 'Inline-4',
-			fuel_type: 'Diesel',
-			transmission_type: 'Manual',
-			horsepower: '180',
-			torque: '220',
-			seating_capacity: 4
-		},
-		{
-			car_model_id: '3',
-			car_model_name: 'Model 3',
-			manufacturer: 'Ford',
-			version: '3.0',
-			engine_type: 'V8',
-			fuel_type: 'Gasoline',
-			transmission_type: 'Automatic',
-			horsepower: '450',
-			torque: '400',
-			seating_capacity: 7
-		},
-		{
-			car_model_id: '4',
-			car_model_name: 'Model 4',
-			manufacturer: 'BMW',
-			version: '4.0',
-			engine_type: 'Inline-6',
-			fuel_type: 'Gasoline',
-			transmission_type: 'Automatic',
-			horsepower: '320',
-			torque: '300',
-			seating_capacity: 5
-		},
-		{
-			car_model_id: '5',
-			car_model_name: 'Model 5',
-			manufacturer: 'Ferrari',
-			version: '5.0',
-			engine_type: 'V12',
-			fuel_type: 'Gasoline',
-			transmission_type: 'Automatic',
-			horsepower: '650',
-			torque: '600',
-			seating_capacity: 2
+	// auto update carModel in table whenever data.carModels (returned from server load function) changes
+	// The data.carModels will change when we create, edit or delete
+	$: carModels = data.carModels;
+
+	// Create a variable with type of carModel but all properties are optional
+	let currentEditingCarModel: Partial<(typeof carModels)[number]> = {};
+
+	// Variables responsible for modal showing
+	let creatingCarModel = false;
+	let editingCarModel = false;
+	let deletingCarModel = false;
+
+	// Variables responsible for checkboxes functions to work
+	let selectedCarModels: number[] = [];
+	let isTableHeadChecked = false;
+	let isAllTableRowChecked = false;
+	$: totalCarModels = carModels.length;
+
+	// Variable responsible for notifications states
+	let successfulCancel = false;
+
+	// Update state for notifications when operate on table
+	$: {
+		if (form?.status === 'success') {
+			setTimeout(() => {
+				if (form) {
+					form.status = '';
+					form.action = '';
+				}
+			}, 3000);
+		} else if (form?.action === 'failed') {
 		}
-	];
+	}
 
-	let models: modelType[];
+	// Update carModels based on results matched the search query
+	$: {
+		if (form?.status === 'success' && form?.action === 'searchCarModels') {
+			const matchedCarModelIds = form?.matchedCarModelIds;
 
-	// TODO: cant access local storage without checking first
-	// let localModels = localStorage.getItem('models') as string;
+			carModels = carModels.filter((carModel) => {
+				return matchedCarModelIds?.includes(carModel.id);
+			});
 
-	// if (localModels !== null) {
-	// 	models = JSON.parse(localModels);
-	// } else {
-	// 	models = default_models;
-	// }
-
-	models = default_models;
-
-	console.log(models);
-
-	onMount(() => {
-		// normal user not allowed to access this page
-		const isAdmin = localStorage.getItem('role');
-		if (!isAdmin) {
-			goto('/');
+			if (form) {
+				form.status = '';
+				form.action = '';
+			}
 		}
-
-		// asign data to table
-	});
-
-	afterUpdate(() => {
-		// TODO: handle form submit
-	});
-
-	let newAndEditFormModal = false;
-	let deleteFormModal = false;
-
-	let currentEditingModel: {
-		car_model_id?: string;
-		car_model_name?: string;
-		manufacturer?: string;
-		version?: string;
-		engine_type?: string;
-		fuel_type?: string;
-		transmission_type?: string;
-		horsepower?: string;
-		torque?: string;
-		seating_capacity?: number;
-	};
-
-	let listOfSelectedOwner: string[] = [];
+	}
 </script>
 
 <div class="w-1/2 bg-primary_color">
-	<form method="POST" class="bg-secondary_color" use:enhance>
+	<form method="POST" action="?/searchCarModels" class="bg-secondary_color" use:enhance>
 		<Label for="search" class="" />
 		<Input
-			name="search"
+			name="searchQuery"
 			id="search"
 			placeholder="Enter your text here"
 			size="md"
@@ -172,50 +101,105 @@
 			</Button>
 		</Input>
 	</form>
+
+	{#if form?.status === 'success' || form?.status === 'failed' || successfulCancel}
+		<div class="text-sm absolute right-14 top-16">
+			<div class="flex flex-col gap-4">
+				{#if form?.status === 'success'}
+					{#if form?.action === 'createCarModel'}
+						<div>
+							<p class="text-sm p-2 bg-light_green text-brown font-bold rounded-lg">
+								Created Successful!
+							</p>
+						</div>
+					{:else if form?.action === 'deleteCarModel'}
+						<div>
+							<p class="text-sm p-2 bg-light_green text-brown font-bold rounded-lg">
+								Deleted Successful!
+							</p>
+						</div>
+					{:else if form?.action === 'deleteManyCarModels	'}
+						<div>
+							<p class="text-sm p-2 bg-light_green text-brown font-bold rounded-lg">
+								Deleted Successful!
+							</p>
+						</div>
+					{:else if form?.action === 'editCarModel'}
+						<div>
+							<p class="text-sm p-2 bg-light_green text-brown font-bold rounded-lg">
+								Editted Successful!
+							</p>
+						</div>
+					{/if}
+				{/if}
+
+				{#if successfulCancel}
+					<div>
+						<p
+							class="text-sm p-2 px-6 text-center bg-error_red text-light_yellow font-bold rounded-lg"
+						>
+							Canceled!
+						</p>
+					</div>
+				{/if}
+			</div>
+		</div>
+	{/if}
 </div>
 
 <div class="grow w-4/5 rounded-xl p-4 bg-gray-50 overflow-scroll">
-	<div class="flex justify-end">
-		{#if listOfSelectedOwner.length === models.length}
+	<div class="flex justify-between flex-row-reverse">
+		<Button
+			class="mb-2"
+			size="xs"
+			on:click={() => {
+				creatingCarModel = true;
+				currentEditingCarModel = {};
+			}}
+		>
+			New
+		</Button>
+		{#if selectedCarModels.length > 1}
 			<Button
 				class="mb-2"
 				size="xs"
 				on:click={() => {
-					deleteFormModal = true;
+					deletingCarModel = true;
 				}}
 			>
 				Delete Selected
 			</Button>
 		{/if}
-		<Button
-			class="mb-2"
-			size="xs"
-			on:click={() => {
-				newAndEditFormModal = true;
-				currentEditingModel = {};
-			}}
-		>
-			New
-		</Button>
 	</div>
-
-	<!-- Table here -->
 	<Table hoverable={true} striped={true} color="default">
 		<TableHead class="bg-gray-200">
 			<TableHeadCell class="!p-4">
-				<Checkbox />
+				<Checkbox
+					checked={isAllTableRowChecked}
+					on:click={() => {
+						// if checked = true, all the carModels need to be checked
+						isTableHeadChecked = !isTableHeadChecked;
+
+						// when TableHead is checked, add all carModels id to selectedCarModels list
+						// reset selectedCarModels when uncheck
+						if (isTableHeadChecked) {
+							selectedCarModels = carModels.map((carModel) => carModel.id);
+						} else {
+							selectedCarModels = [];
+						}
+					}}
+				/>
 			</TableHeadCell>
 			<TableHeadCell>Car Model ID</TableHeadCell>
-			<TableHeadCell>Car Model Name</TableHeadCell>
-			<TableHeadCell>manufacturer</TableHeadCell>
-			<TableHeadCell>version</TableHeadCell>
-			<TableHeadCell>engine type</TableHeadCell>
-			<TableHeadCell>fuel type</TableHeadCell>
-			<TableHeadCell>transmission type</TableHeadCell>
-			<TableHeadCell>horsepower</TableHeadCell>
-			<TableHeadCell>torque</TableHeadCell>
-			<TableHeadCell>seating capacity</TableHeadCell>
-			<TableHeadCell>Actions</TableHeadCell>
+			<TableHeadCell>Model Name</TableHeadCell>
+			<TableHeadCell>Manufacturer</TableHeadCell>
+			<TableHeadCell>Version</TableHeadCell>
+			<TableHeadCell>Engine</TableHeadCell>
+			<TableHeadCell>Fuel Type</TableHeadCell>
+			<TableHeadCell>Transmission Type</TableHeadCell>
+			<TableHeadCell>Horsepower</TableHeadCell>
+			<TableHeadCell>Torque</TableHeadCell>
+			<TableHeadCell>Seating Capacity</TableHeadCell>
 			<TableHeadCell>
 				<span class="sr-only"> Edit </span>
 			</TableHeadCell>
@@ -224,40 +208,47 @@
 			</TableHeadCell>
 		</TableHead>
 		<TableBody>
-			{#each models as model}
+			{#each carModels as carModel}
 				<TableBodyRow>
 					<TableBodyCell class="!p-4">
 						<Checkbox
+							checked={isTableHeadChecked}
 							on:click={() => {
-								const index = listOfSelectedOwner.findIndex(
-									(car_model_id) => (model.car_model_id = car_model_id)
-								);
-
-								if (index === -1) {
-									listOfSelectedOwner = [...listOfSelectedOwner, model.car_model_id];
+								// if carModel.id is in selectedCarModels, remove it
+								// else add it
+								// note: reactivity in svelte is triggered by assignment
+								if (selectedCarModels.includes(carModel.id)) {
+									selectedCarModels = selectedCarModels.filter((id) => carModel.id !== id);
 								} else {
-									listOfSelectedOwner.splice(index, 1);
+									selectedCarModels = [...selectedCarModels, carModel.id];
+								}
+
+								// if all carModels are checked, then checkbox in TableHead is checked
+								if (selectedCarModels.length === totalCarModels) {
+									isAllTableRowChecked = true;
+								} else {
+									isAllTableRowChecked = false;
 								}
 							}}
 						/>
 					</TableBodyCell>
-					<TableBodyCell>{model?.car_model_id}</TableBodyCell>
-					<TableBodyCell>{model?.car_model_name}</TableBodyCell>
-					<TableBodyCell>{model?.manufacturer}</TableBodyCell>
-					<TableBodyCell>{model?.version}</TableBodyCell>
-					<TableBodyCell>{model?.engine_type}</TableBodyCell>
-					<TableBodyCell>{model?.fuel_type}</TableBodyCell>
-					<TableBodyCell>{model?.transmission_type}</TableBodyCell>
-					<TableBodyCell>{model?.horsepower}</TableBodyCell>
-					<TableBodyCell>{model?.torque}</TableBodyCell>
-					<TableBodyCell>{model?.seating_capacity}</TableBodyCell>
+					<TableBodyCell>{carModel?.id}</TableBodyCell>
+					<TableBodyCell>{carModel?.modelName}</TableBodyCell>
+					<TableBodyCell>{carModel?.manufacturer}</TableBodyCell>
+					<TableBodyCell>{carModel?.version}</TableBodyCell>
+					<TableBodyCell>{carModel?.engineType}</TableBodyCell>
+					<TableBodyCell>{carModel?.fuelType}</TableBodyCell>
+					<TableBodyCell>{carModel?.transmissionType}</TableBodyCell>
+					<TableBodyCell>{carModel?.horsepower}</TableBodyCell>
+					<TableBodyCell>{carModel?.torque}</TableBodyCell>
+					<TableBodyCell>{carModel?.seatingCapacity}</TableBodyCell>
 					<TableBodyCell>
 						<Button
 							size="xs"
 							color="dark"
 							on:click={() => {
-								newAndEditFormModal = true;
-								currentEditingModel = model;
+								editingCarModel = true;
+								currentEditingCarModel = carModel;
 							}}
 						>
 							Edit
@@ -266,8 +257,8 @@
 							size="xs"
 							color="red"
 							on:click={() => {
-								deleteFormModal = true;
-								currentEditingModel = model;
+								deletingCarModel = true;
+								currentEditingCarModel = carModel;
 							}}
 						>
 							Delete
@@ -277,33 +268,135 @@
 			{/each}
 		</TableBody>
 
-		<Modal bind:open={newAndEditFormModal} outsideclose={true} size="md" class="w-full">
-			<form method="POST" action="?/changeUser" use:enhance>
+		<!-- New Modal -->
+		<Modal bind:open={creatingCarModel} outsideclose={true} size="md" class="w-full">
+			<form
+				method="POST"
+				action="?/createCarModel"
+				use:enhance={() => {
+					return async ({ result }) => {
+						if (result.status === 200) {
+							invalidateAll();
+							creatingCarModel = false;
+						}
+
+						await applyAction(result);
+					};
+				}}
+			>
+				<Label class="space-y-2">
+					<span>Model Name</span>
+					<Input type="text" name="modelName" placeholder="Vinfast VF8..." />
+				</Label>
+				<Label class="space-y-2">
+					<span>Manufacturer</span>
+					<Input type="text" name="manufacturer" placeholder="Vinfast..." />
+				</Label>
+				<Label class="space-y-2">
+					<span>Version</span>
+					<Input type="text" name="version" placeholder="VF8..." />
+				</Label>
+				<Label class="space-y-2">
+					<span>Engine Type</span>
+					<Input type="text" name="engineType" placeholder="V8..." />
+				</Label>
+				<Label class="space-y-2">
+					<span>Fuel Type</span>
+					<Input type="text" name="fuelType" placeholder="Gasoline..." />
+				</Label>
+				<Label class="space-y-2">
+					<span>Transmission Type</span>
+					<Input type="text" name="transmissionType" placeholder="Automatic..." />
+				</Label>
+				<Label class="space-y-2">
+					<span>Horsepower</span>
+					<Input type="text" name="horsepower" placeholder="420..." />
+				</Label>
+				<Label class="space-y-2">
+					<span>Torque</span>
+					<Input type="text" name="torque" placeholder="650..." />
+				</Label>
+				<Label class="space-y-2">
+					<span>Seating Capacity</span>
+					<Input type="text" name="seatingCapacity" placeholder="5..." />
+				</Label>
+
+				<div class="flex flex-row items-center justify-center">
+					<Button
+						type="button"
+						color="red"
+						on:click={() => {
+							creatingCarModel = false;
+							successfulCancel = true;
+
+							// Turn off state to close notification
+							setTimeout(() => {
+								successfulCancel = false;
+							}, 2000);
+						}}>Cancel</Button
+					>
+					<Button
+						type="submit"
+						class="my-4 rounded-xl bg-light_green text-[#675D50] hover:bg-orange hover:text-white m-2"
+						color="none">Add</Button
+					>
+				</div>
+
+				{#if form?.status === 'failed' && form?.invalidData}
+					<p class="text-base text-error_red font-semibold text-center">{form?.message}</p>
+				{/if}
+
+				{#if form?.status === 'success'}
+					<p class="text-base text-[#00b300] font-semibold text-center">{form?.message}</p>
+				{/if}
+			</form>
+		</Modal>
+
+		<!-- Edit Modal -->
+		<Modal bind:open={editingCarModel} outsideclose={true} size="md" class="w-full">
+			<form
+				method="POST"
+				action="?/editCarModel"
+				use:enhance={() => {
+					return async ({ result }) => {
+						if (result.status === 200) {
+							invalidateAll();
+							editingCarModel = false;
+						}
+
+						await applyAction(result);
+					};
+				}}
+			>
 				<Label class="space-y-2">
 					<span>Car Model ID</span>
 					<Input
 						type="text"
-						name="car_model_id"
-						placeholder="a string..."
-						value={currentEditingModel?.car_model_id}
+						name="id"
+						placeholder="Car Model ID Number..."
+						value={currentEditingCarModel?.id}
+						color="green"
+						readonly
 					/>
 				</Label>
+
 				<Label class="space-y-2">
-					<span>Car Model Name</span>
+					<span>Model Name</span>
 					<Input
 						type="text"
-						name="car_model_name"
-						placeholder="car name"
-						value={currentEditingModel?.car_model_name}
+						name="modelName"
+						placeholder="Vinfast VF8..."
+						value={currentEditingCarModel?.modelName}
+						required
 					/>
 				</Label>
 				<Label class="space-y-2">
-					<span>manufacturer</span>
+					<span>Manufacturer</span>
 					<Input
 						type="text"
 						name="manufacturer"
-						placeholder="Toyota..."
-						value={currentEditingModel?.manufacturer}
+						placeholder="Vinfast..."
+						value={currentEditingCarModel?.manufacturer}
 						required
 					/>
 				</Label>
@@ -312,8 +405,8 @@
 					<Input
 						type="text"
 						name="version"
-						placeholder="version..."
-						value={currentEditingModel?.version}
+						placeholder="VF8..."
+						value={currentEditingCarModel?.version}
 						required
 					/>
 				</Label>
@@ -321,28 +414,29 @@
 					<span>Engine Type</span>
 					<Input
 						type="text"
-						name="engine_type"
-						placeholder="V4..."
-						value={currentEditingModel?.engine_type}
-						required
+						name="engineType"
+						placeholder="VF8..."
+						value={currentEditingCarModel?.engineType}
 					/>
 				</Label>
+
 				<Label class="space-y-2">
 					<span>Fuel Type</span>
 					<Input
 						type="text"
-						name="fuel_type"
-						placeholder="Diesel..."
-						value={currentEditingModel?.fuel_type}
+						name="fuelType"
+						placeholder="Gasoline..."
+						value={currentEditingCarModel?.fuelType}
+						required
 					/>
 				</Label>
 				<Label class="space-y-2">
 					<span>Transmission Type</span>
 					<Input
 						type="text"
-						name="transmission_type"
+						name="transmissionType"
 						placeholder="Automatic..."
-						value={currentEditingModel?.transmission_type}
+						value={currentEditingCarModel?.transmissionType}
 					/>
 				</Label>
 				<Label class="space-y-2">
@@ -350,8 +444,8 @@
 					<Input
 						type="text"
 						name="horsepower"
-						placeholder="300"
-						value={currentEditingModel?.horsepower}
+						placeholder="420..."
+						value={currentEditingCarModel?.horsepower}
 					/>
 				</Label>
 				<Label class="space-y-2">
@@ -359,51 +453,59 @@
 					<Input
 						type="text"
 						name="torque"
-						placeholder="280..."
-						value={currentEditingModel?.torque}
+						placeholder="650..."
+						value={currentEditingCarModel?.torque}
 					/>
 				</Label>
 				<Label class="space-y-2">
 					<span>Seating Capacity</span>
 					<Input
 						type="text"
-						name="seating_capacity"
-						placeholder="4"
-						value={currentEditingModel?.seating_capacity}
+						name="seatingCapacity"
+						placeholder="5..."
+						value={currentEditingCarModel?.seatingCapacity}
 					/>
 				</Label>
 
 				<div class="flex flex-row items-center justify-center">
-					<!-- currentEditingModel is modified based on which button user click -->
-					{#if currentEditingModel?.car_model_id === undefined}
-						<!-- Add new user -->
-						<Input type="text" name="action_type" value="add_user" class="hidden" />
-						<Button type="button" color="red" on:click={() => (newAndEditFormModal = false)}
-							>Cancel</Button
-						>
-						<Button
-							type="submit"
-							class="my-4 rounded-xl bg-light_green text-[#675D50] hover:bg-orange hover:text-white m-2"
-							color="none">Add</Button
-						>
-					{:else}
-						<!-- Edit user -->
-						<Input type="text" name="action_type" value="edit_user" class="hidden" />
-						<Button type="button" color="alternative" on:click={() => (newAndEditFormModal = false)}
-							>Cancel</Button
-						>
-						<Button
-							type="submit"
-							class="my-4 rounded-xl bg-light_green text-[#675D50] hover:bg-orange hover:text-white m-2"
-							color="red">Edit</Button
-						>
-					{/if}
+					<Button
+						type="button"
+						color="alternative"
+						on:click={() => {
+							editingCarModel = false;
+							successfulCancel = true;
+
+							// Turn off state to close notification
+							setTimeout(() => {
+								successfulCancel = false;
+							}, 2000);
+						}}>Cancel</Button
+					>
+					<Button
+						type="submit"
+						class="my-4 rounded-xl bg-light_green text-[#675D50] hover:bg-orange hover:text-white m-2"
+						color="red">Save</Button
+					>
 				</div>
 			</form>
 		</Modal>
 
-		<Modal bind:open={deleteFormModal} outsideclose={true} size="md" class="w-full">
-			<form method="POST" action="?/deleteOwner" use:enhance>
+		<!-- Delete Modal -->
+		<Modal bind:open={deletingCarModel} outsideclose={true} size="md" class="w-full">
+			<form
+				method="POST"
+				action="?/deleteCarModel"
+				use:enhance={() => {
+					return async ({ result }) => {
+						if (result.status === 200) {
+							invalidateAll();
+							deletingCarModel = false;
+						}
+
+						await applyAction(result);
+					};
+				}}
+			>
 				<div class="text-center">
 					<svg
 						aria-hidden="true"
@@ -420,26 +522,49 @@
 						/></svg
 					>
 
-					{#if listOfSelectedOwner.length > 1}
+					{#if selectedCarModels.length > 1}
 						<h3 class="mb-5 text-lg font-normal text-gray-500 dark:text-gray-400">
-							Are you sure you want to delete <strong>THESE</strong> models?
+							Are you sure you want to delete <strong>THESE</strong> selected car models?
 						</h3>
+						<Input type="text" name="ids" class="hidden" value={selectedCarModels} />
+						<Button
+							type="button"
+							color="alternative"
+							on:click={() => {
+								deletingCarModel = false;
+								successfulCancel = true;
+
+								// Turn off state to close notification
+								setTimeout(() => {
+									successfulCancel = false;
+								}, 2000);
+							}}>No, cancel</Button
+						>
+						<Button type="submit" color="red" class="mr-2" formaction="?/deleteManyCarModels"
+							>Yes, I'm sure</Button
+						>
 					{:else}
 						<h3 class="mb-5 text-lg font-normal text-gray-500 dark:text-gray-400">
-							Are you sure you want to delete this model?
+							Are you sure you want to delete this car model?
 						</h3>
-					{/if}
+						<Input type="text" name="id" class="hidden" value={currentEditingCarModel.id} />
+						<Button
+							type="button"
+							color="alternative"
+							on:click={() => {
+								deletingCarModel = false;
+								successfulCancel = true;
 
-					<Input
-						type="text"
-						name="user_id"
-						class="hidden"
-						value={currentEditingModel.car_model_id}
-					/>
-					<Button type="button" color="alternative" on:click={() => (deleteFormModal = false)}
-						>No, cancel</Button
-					>
-					<Button type="submit" color="red" class="mr-2">Yes, I'm sure</Button>
+								// Turn off state to close notification
+								setTimeout(() => {
+									successfulCancel = false;
+								}, 2000);
+							}}>No, cancel</Button
+						>
+						<Button type="submit" color="red" class="mr-2" formaction="?/deleteCarModel"
+							>Yes, I'm sure</Button
+						>
+					{/if}
 				</div>
 			</form>
 		</Modal>
