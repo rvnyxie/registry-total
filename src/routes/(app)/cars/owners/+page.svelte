@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { enhance } from '$app/forms';
-	import { goto } from '$app/navigation';
+	import { applyAction, enhance } from '$app/forms';
+	import { invalidateAll } from '$app/navigation';
 	import { Label, Input, Button, Modal } from 'flowbite-svelte';
 	import {
 		Table,
@@ -11,96 +11,68 @@
 		TableHeadCell,
 		Checkbox
 	} from 'flowbite-svelte';
-	import { onMount, afterUpdate } from 'svelte';
 
 	export let form;
+	export let data;
 
-	type ownerType = {
-		owner_id: string;
-		full_name: string;
-		address?: string;
-		phone_number?: string;
-		email?: string;
-		owner_type?: string;
-		company_name?: string;
-		type_of_business?: string;
-		company_type?: string;
-	};
+	let owners = data.owners;
 
-	const default_owners: ownerType[] = [
-		{
-			owner_id: '123456789',
-			full_name: 'Nyx Isl',
-			address: '123 example strees',
-			phone_number: '012345678',
-			email: 'dp@mail.com',
-			owner_type: 'personal',
-			company_name: '',
-			type_of_business: '',
-			company_type: ''
-		},
-		{
-			owner_id: '987654321',
-			full_name: 'Nam Nt',
-			address: '456 example strees',
-			phone_number: '087654321',
-			email: 'nt@mail.com',
-			owner_type: 'commercial',
-			company_name: 'fake compayny name',
-			type_of_business: 'transporting',
-			company_type: 'partnership'
+	// auto update owner in table whenever data.owners (returned from server load function) changes
+	// The data.owners will change when we create, edit or delete
+	$: owners = data.owners;
+
+	// Create a variable with type of owner but all properties are optional
+	let currentEditingOwner: Partial<(typeof owners)[number]> = {};
+
+	// Variables responsible for modal showing
+	let creatingOwner = false;
+	let editingOwner = false;
+	let deletingOwner = false;
+
+	// Variables responsible for checkboxes functions to work
+	let selectedOwners: string[] = [];
+	let isTableHeadChecked = false;
+	let isAllTableRowChecked = false;
+	$: totalOwners = owners.length;
+
+	// Variable responsible for notifications states
+	let successfulCancel = false;
+
+	// Update state for notifications when operate on table
+	$: {
+		if (form?.status === 'success') {
+			setTimeout(() => {
+				if (form) {
+					form.status = '';
+					form.action = '';
+				}
+			}, 3000);
+		} else if (form?.action === 'failed') {
 		}
-	];
-
-	let owners: ownerType[];
-
-	let localOwners = localStorage.getItem('owner') as string;
-
-	if (localOwners !== null) {
-		owners = JSON.parse(localOwners);
-	} else {
-		owners = default_owners;
 	}
 
-	console.log(owners);
+	// Update owners based on results matched the search query
+	$: {
+		if (form?.status === 'success' && form?.action === 'searchOwners') {
+			const matchedOwnerIds = form?.matchedOwnerIds;
 
-	onMount(() => {
-		// normal user not allowed to access this page
-		const isAdmin = localStorage.getItem('role');
-		if (!isAdmin) {
-			goto('/');
+			owners = owners.filter((owner) => {
+				return matchedOwnerIds?.includes(owner.id);
+			});
+
+			if (form) {
+				form.status = '';
+				form.action = '';
+			}
 		}
-
-		// asign data to table
-	});
-
-	afterUpdate(() => {
-		// TODO: handle form submit
-	});
-
-	let newAndEditFormModal = false;
-	let deleteFormModal = false;
-
-	let currentEditingOwner: {
-		owner_id?: string;
-		full_name?: string;
-		address?: string;
-		phone_number?: string;
-		email?: string;
-		owner_type?: string;
-		company_name?: string;
-		type_of_business?: string;
-		company_type?: string;
-	};
-
-	let listOfSelectedOwner: string[] = [];
+	}
 </script>
 
 <div class="w-1/2 bg-primary_color">
-	<form method="POST" class="bg-secondary_color" use:enhance>
+	<form method="POST" action="?/searchOwners" class="bg-secondary_color" use:enhance>
 		<Label for="search" class="" />
 		<Input
-			name="search"
+			name="searchQuery"
 			id="search"
 			placeholder="Enter your text here"
 			size="md"
@@ -129,48 +101,98 @@
 			</Button>
 		</Input>
 	</form>
+
+	{#if form?.status === 'success' || form?.status === 'failed' || successfulCancel}
+		<div class="text-sm absolute right-14 top-16">
+			<div class="flex flex-col gap-4">
+				{#if form?.status === 'success'}
+					{#if form?.action === 'createOwner'}
+						<div>
+							<p class="text-sm p-2 bg-light_green text-brown font-bold rounded-lg">
+								Created Successful!
+							</p>
+						</div>
+					{:else if form?.action === 'deleteOwner'}
+						<div>
+							<p class="text-sm p-2 bg-light_green text-brown font-bold rounded-lg">
+								Deleted Successful!
+							</p>
+						</div>
+					{:else if form?.action === 'editOwner'}
+						<div>
+							<p class="text-sm p-2 bg-light_green text-brown font-bold rounded-lg">
+								Editted Successful!
+							</p>
+						</div>
+					{/if}
+				{/if}
+
+				{#if successfulCancel}
+					<div>
+						<p
+							class="text-sm p-2 px-6 text-center bg-error_red text-light_yellow font-bold rounded-lg"
+						>
+							Canceled!
+						</p>
+					</div>
+				{/if}
+			</div>
+		</div>
+	{/if}
 </div>
 
 <div class="grow w-4/5 rounded-xl p-4 bg-gray-50 overflow-scroll">
-	<div class="flex justify-end">
-		{#if listOfSelectedOwner.length === owners.length}
-			<Button
-				class="mb-2"
-				size="xs"
-				on:click={() => {
-					deleteFormModal = true;
-				}}
-			>
-				Delete Selected
-			</Button>
-		{/if}
+	<div class="flex justify-between flex-row-reverse">
 		<Button
 			class="mb-2"
 			size="xs"
 			on:click={() => {
-				newAndEditFormModal = true;
+				creatingOwner = true;
 				currentEditingOwner = {};
 			}}
 		>
 			New
 		</Button>
+		{#if selectedOwners.length > 1}
+			<Button
+				class="mb-2"
+				size="xs"
+				on:click={() => {
+					deletingOwner = true;
+				}}
+			>
+				Delete Selected
+			</Button>
+		{/if}
 	</div>
-
-	<!-- Table here -->
 	<Table hoverable={true} striped={true} color="default">
 		<TableHead class="bg-gray-200">
 			<TableHeadCell class="!p-4">
-				<Checkbox />
+				<Checkbox
+					checked={isAllTableRowChecked}
+					on:click={() => {
+						// if checked = true, all the owners need to be checked
+						isTableHeadChecked = !isTableHeadChecked;
+
+						// when TableHead is checked, add all owners id to selectedOwners list
+						// reset selectedOwners when uncheck
+						if (isTableHeadChecked) {
+							selectedOwners = owners.map((owner) => owner.id);
+						} else {
+							selectedOwners = [];
+						}
+					}}
+				/>
 			</TableHeadCell>
 			<TableHeadCell>Owner ID</TableHeadCell>
-			<TableHeadCell>Owner Type</TableHeadCell>
-			<TableHeadCell>Phone Number</TableHeadCell>
+			<TableHeadCell>Fullname</TableHeadCell>
 			<TableHeadCell>Address</TableHeadCell>
-			<TableHeadCell>Full Name</TableHeadCell>
-			<TableHeadCell>Company Name</TableHeadCell>
+			<TableHeadCell>Phone Number</TableHeadCell>
+			<TableHeadCell>Email</TableHeadCell>
+			<TableHeadCell>Owner Type</TableHeadCell>
 			<TableHeadCell>Company Type</TableHeadCell>
+			<TableHeadCell>Company Name</TableHeadCell>
 			<TableHeadCell>Type Of Business</TableHeadCell>
-			<TableHeadCell>Actions</TableHeadCell>
 			<TableHeadCell>
 				<span class="sr-only"> Edit </span>
 			</TableHeadCell>
@@ -183,33 +205,41 @@
 				<TableBodyRow>
 					<TableBodyCell class="!p-4">
 						<Checkbox
+							checked={isTableHeadChecked}
 							on:click={() => {
-								const index = listOfSelectedOwner.findIndex(
-									(owner_id) => (owner.owner_id = owner_id)
-								);
-
-								if (index === -1) {
-									listOfSelectedOwner = [...listOfSelectedOwner, owner.owner_id];
+								// if owner.id is in selectedOwners, remove it
+								// else add it
+								// note: reactivity in svelte is triggered by assignment
+								if (selectedOwners.includes(owner.id)) {
+									selectedOwners = selectedOwners.filter((id) => owner.id !== id);
 								} else {
-									listOfSelectedOwner.splice(index, 1);
+									selectedOwners = [...selectedOwners, owner.id];
+								}
+
+								// if all owners are checked, then checkbox in TableHead is checked
+								if (selectedOwners.length === totalOwners) {
+									isAllTableRowChecked = true;
+								} else {
+									isAllTableRowChecked = false;
 								}
 							}}
 						/>
 					</TableBodyCell>
-					<TableBodyCell>{owner?.owner_id}</TableBodyCell>
-					<TableBodyCell>{owner?.owner_type}</TableBodyCell>
-					<TableBodyCell>{owner?.phone_number}</TableBodyCell>
+					<TableBodyCell>{owner?.id}</TableBodyCell>
+					<TableBodyCell>{owner?.fullname}</TableBodyCell>
 					<TableBodyCell>{owner?.address}</TableBodyCell>
-					<TableBodyCell>{owner?.full_name}</TableBodyCell>
-					<TableBodyCell>{owner?.company_name}</TableBodyCell>
-					<TableBodyCell>{owner?.company_type}</TableBodyCell>
-					<TableBodyCell>{owner?.type_of_business}</TableBodyCell>
+					<TableBodyCell>{owner?.phoneNumber}</TableBodyCell>
+					<TableBodyCell>{owner?.email ? owner.email : ''}</TableBodyCell>
+					<TableBodyCell>{owner?.ownerType}</TableBodyCell>
+					<TableBodyCell>{owner?.companyType ? owner.companyType : ''}</TableBodyCell>
+					<TableBodyCell>{owner?.companyName ? owner.companyName : ''}</TableBodyCell>
+					<TableBodyCell>{owner?.typeOfBusiness ? owner.typeOfBusiness : ''}</TableBodyCell>
 					<TableBodyCell>
 						<Button
 							size="xs"
 							color="dark"
 							on:click={() => {
-								newAndEditFormModal = true;
+								editingOwner = true;
 								currentEditingOwner = owner;
 							}}
 						>
@@ -219,7 +249,7 @@
 							size="xs"
 							color="red"
 							on:click={() => {
-								deleteFormModal = true;
+								deletingOwner = true;
 								currentEditingOwner = owner;
 							}}
 						>
@@ -230,33 +260,136 @@
 			{/each}
 		</TableBody>
 
-		<Modal bind:open={newAndEditFormModal} outsideclose={true} size="md" class="w-full">
-			<form method="POST" action="?/changeUser" use:enhance>
+		<!-- New Modal -->
+		<Modal bind:open={creatingOwner} outsideclose={true} size="md" class="w-full">
+			<form
+				method="POST"
+				action="?/createOwner"
+				use:enhance={() => {
+					return async ({ result }) => {
+						if (result.status === 200) {
+							invalidateAll();
+							creatingOwner = false;
+						}
+
+						await applyAction(result);
+					};
+				}}
+			>
+				<Label class="space-y-2">
+					<span>Owner ID</span>
+					<Input type="text" name="id" placeholder="Citizen ID Number..." />
+				</Label>
+				<Label class="space-y-2">
+					<span>Fullname</span>
+					<Input type="text" name="fullname" placeholder="Nguyen Van A" />
+				</Label>
+				<Label class="space-y-2">
+					<span>Address</span>
+					<Input type="text" name="address" placeholder="123 Street, ABC ward, XYZ district..." />
+				</Label>
+				<Label class="space-y-2">
+					<span>Phone Number</span>
+					<Input type="text" name="phoneNumber" placeholder="10 digit phone number..." />
+				</Label>
+				<Label class="space-y-2">
+					<span>Email</span>
+					<Input type="email" name="email" placeholder="owner@mail.com" />
+				</Label>
+				<Label class="space-y-2">
+					<span>Owner Type</span>
+					<Input type="text" name="ownerType" placeholder="personal/company" />
+				</Label>
+				<Label class="space-y-2">
+					<span>Company Type</span>
+					<Input
+						type="text"
+						name="companyType"
+						placeholder="corporation/llc/partnership/... (REQUIRED if owner type is not personal)"
+					/>
+				</Label>
+				<Label class="space-y-2">
+					<span>Company Name</span>
+					<Input
+						type="text"
+						name="companyName"
+						placeholder="BigIno Inc... (REQUIRED if owner type is not personal)"
+					/>
+				</Label>
+				<Label class="space-y-2">
+					<span>Type Of Business</span>
+					<Input
+						type="text"
+						name="typeOfBusiness"
+						placeholder="manufacturer/retail/... (REQUIRED if owner type is not personal)"
+					/>
+				</Label>
+
+				<div class="flex flex-row items-center justify-center">
+					<Button
+						type="button"
+						color="red"
+						on:click={() => {
+							creatingOwner = false;
+							successfulCancel = true;
+
+							// Turn off state to close notification
+							setTimeout(() => {
+								successfulCancel = false;
+							}, 2000);
+						}}>Cancel</Button
+					>
+					<Button
+						type="submit"
+						class="my-4 rounded-xl bg-light_green text-[#675D50] hover:bg-orange hover:text-white m-2"
+						color="none">Add</Button
+					>
+				</div>
+
+				{#if form?.status === 'failed' && form?.invalidData}
+					<p class="text-base text-error_red font-semibold text-center">{form?.message}</p>
+				{/if}
+
+				{#if form?.status === 'success'}
+					<p class="text-base text-[#00b300] font-semibold text-center">{form?.message}</p>
+				{/if}
+			</form>
+		</Modal>
+
+		<!-- Edit Modal -->
+		<Modal bind:open={editingOwner} outsideclose={true} size="md" class="w-full">
+			<form
+				method="POST"
+				action="?/editOwner"
+				use:enhance={() => {
+					return async ({ result }) => {
+						if (result.status === 200) {
+							invalidateAll();
+							editingOwner = false;
+						}
+
+						await applyAction(result);
+					};
+				}}
+			>
 				<Label class="space-y-2">
 					<span>Owner ID</span>
 					<Input
 						type="text"
-						name="owner_id"
-						placeholder="a number"
-						value={currentEditingOwner?.owner_id}
+						name="id"
+						placeholder="Citizen ID Number..."
+						value={currentEditingOwner?.id}
+						required
 					/>
 				</Label>
+
 				<Label class="space-y-2">
-					<span>Owner Type</span>
+					<span>Fullname</span>
 					<Input
 						type="text"
-						name="owner_type"
-						placeholder="personal or commercial"
-						value={currentEditingOwner?.owner_type}
-					/>
-				</Label>
-				<Label class="space-y-2">
-					<span>Phone Number</span>
-					<Input
-						type="password"
-						name="phone_number"
-						placeholder="•••••"
-						value={currentEditingOwner?.phone_number}
+						name="fullname"
+						placeholder="Nguyen Van A"
+						value={currentEditingOwner?.fullname}
 						required
 					/>
 				</Label>
@@ -265,79 +398,108 @@
 					<Input
 						type="text"
 						name="address"
-						placeholder="123 street..."
+						placeholder="123 Street, ABC ward, XYZ district..."
 						value={currentEditingOwner?.address}
 						required
 					/>
 				</Label>
 				<Label class="space-y-2">
-					<span>Full Name</span>
+					<span>Phone Number</span>
 					<Input
 						type="text"
-						name="full_name"
-						placeholder="Jhon Wick"
-						value={currentEditingOwner?.full_name}
+						name="phoneNumber"
+						placeholder="10 digit phone number..."
+						value={currentEditingOwner?.phoneNumber}
+						required
 					/>
 				</Label>
 				<Label class="space-y-2">
-					<span>Company Name</span>
+					<span>Email</span>
+					<Input
+						type="email"
+						name="email"
+						placeholder="owner@mail.com"
+						value={currentEditingOwner?.email}
+					/>
+				</Label>
+
+				<Label class="space-y-2">
+					<span>Owner Type</span>
 					<Input
 						type="text"
-						name="company_name"
-						placeholder="company name"
-						value={currentEditingOwner?.company_name}
+						name="ownerType"
+						placeholder="personal/company"
+						value={currentEditingOwner?.ownerType}
+						required
 					/>
 				</Label>
 				<Label class="space-y-2">
 					<span>Company Type</span>
 					<Input
 						type="text"
-						name="company_type"
-						placeholder="2023-06-15"
-						value={currentEditingOwner?.company_type}
+						name="companyType"
+						placeholder="corporation/llc/partnership/... (REQUIRED if owner type is not personal)"
+						value={currentEditingOwner?.companyType}
+					/>
+				</Label>
+				<Label class="space-y-2">
+					<span>Company Name</span>
+					<Input
+						type="text"
+						name="companyName"
+						placeholder="BigIno Inc... (REQUIRED if owner type is not personal)"
+						value={currentEditingOwner?.companyName}
 					/>
 				</Label>
 				<Label class="space-y-2">
 					<span>Type Of Business</span>
 					<Input
 						type="text"
-						name="type_of_business"
-						placeholder="Coorporartion..."
-						value={currentEditingOwner?.type_of_business}
+						name="typeOfBusiness"
+						placeholder="manufacturer/retail/... (REQUIRED if owner type is not personal)"
+						value={currentEditingOwner?.typeOfBusiness}
 					/>
 				</Label>
 
 				<div class="flex flex-row items-center justify-center">
-					<!-- currentEditingOwner is modified based on which button user click -->
-					{#if currentEditingOwner?.owner_id === undefined}
-						<!-- Add new user -->
-						<Input type="text" name="action_type" value="add_user" class="hidden" />
-						<Button type="button" color="red" on:click={() => (newAndEditFormModal = false)}
-							>Cancel</Button
-						>
-						<Button
-							type="submit"
-							class="my-4 rounded-xl bg-light_green text-[#675D50] hover:bg-orange hover:text-white m-2"
-							color="none">Add</Button
-						>
-					{:else}
-						<!-- Edit user -->
-						<Input type="text" name="action_type" value="edit_user" class="hidden" />
-						<Button type="button" color="alternative" on:click={() => (newAndEditFormModal = false)}
-							>Cancel</Button
-						>
-						<Button
-							type="submit"
-							class="my-4 rounded-xl bg-light_green text-[#675D50] hover:bg-orange hover:text-white m-2"
-							color="red">Edit</Button
-						>
-					{/if}
+					<Button
+						type="button"
+						color="alternative"
+						on:click={() => {
+							editingOwner = false;
+							successfulCancel = true;
+
+							// Turn off state to close notification
+							setTimeout(() => {
+								successfulCancel = false;
+							}, 2000);
+						}}>Cancel</Button
+					>
+					<Button
+						type="submit"
+						class="my-4 rounded-xl bg-light_green text-[#675D50] hover:bg-orange hover:text-white m-2"
+						color="red">Save</Button
+					>
 				</div>
 			</form>
 		</Modal>
 
-		<Modal bind:open={deleteFormModal} outsideclose={true} size="md" class="w-full">
-			<form method="POST" action="?/deleteOwner" use:enhance>
+		<!-- Delete Modal -->
+		<Modal bind:open={deletingOwner} outsideclose={true} size="md" class="w-full">
+			<form
+				method="POST"
+				action="?/deleteOwner"
+				use:enhance={() => {
+					return async ({ result }) => {
+						if (result.status === 200) {
+							invalidateAll();
+							deletingOwner = false;
+						}
+
+						await applyAction(result);
+					};
+				}}
+			>
 				<div class="text-center">
 					<svg
 						aria-hidden="true"
@@ -354,21 +516,49 @@
 						/></svg
 					>
 
-					{#if listOfSelectedOwner.length > 1}
+					{#if selectedOwners.length > 1}
 						<h3 class="mb-5 text-lg font-normal text-gray-500 dark:text-gray-400">
-							Are you sure you want to delete <strong>THESE</strong> people?
+							Are you sure you want to delete <strong>THESE</strong> selected owners?
 						</h3>
+						<Input type="text" name="ids" class="hidden" value={selectedOwners} />
+						<Button
+							type="button"
+							color="alternative"
+							on:click={() => {
+								deletingOwner = false;
+								successfulCancel = true;
+
+								// Turn off state to close notification
+								setTimeout(() => {
+									successfulCancel = false;
+								}, 2000);
+							}}>No, cancel</Button
+						>
+						<Button type="submit" color="red" class="mr-2" formaction="?/deleteManyOwners"
+							>Yes, I'm sure</Button
+						>
 					{:else}
 						<h3 class="mb-5 text-lg font-normal text-gray-500 dark:text-gray-400">
-							Are you sure you want to delete this person?
+							Are you sure you want to delete this owner?
 						</h3>
-					{/if}
+						<Input type="text" name="id" class="hidden" value={currentEditingOwner.id} />
+						<Button
+							type="button"
+							color="alternative"
+							on:click={() => {
+								deletingOwner = false;
+								successfulCancel = true;
 
-					<Input type="text" name="user_id" class="hidden" value={currentEditingOwner.owner_id} />
-					<Button type="button" color="alternative" on:click={() => (deleteFormModal = false)}
-						>No, cancel</Button
-					>
-					<Button type="submit" color="red" class="mr-2">Yes, I'm sure</Button>
+								// Turn off state to close notification
+								setTimeout(() => {
+									successfulCancel = false;
+								}, 2000);
+							}}>No, cancel</Button
+						>
+						<Button type="submit" color="red" class="mr-2" formaction="?/deleteOwner"
+							>Yes, I'm sure</Button
+						>
+					{/if}
 				</div>
 			</form>
 		</Modal>

@@ -203,7 +203,7 @@
 			</TableHeadCell>
 		</TableHead>
 		<TableBody>
-			{#each accounts as account, rowIndex}
+			{#each accounts as account}
 				<TableBodyRow>
 					<TableBodyCell class="!p-4">
 						<Checkbox
