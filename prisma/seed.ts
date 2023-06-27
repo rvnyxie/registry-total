@@ -165,8 +165,8 @@ async function main() {
     // CREATE CAR INSPECTION
     await prisma.carInspection.create({
         data: {
-            // 3-last-digit of car, 3-last-digit of owner, first characters of station name, date of inspection, random 2 characters
-            id: '444333NIS230623XZ',
+            // 3-first-digit of car, 3-first-digit of station id, date of inspection, random 3 characters
+            id: '444001230623XYZ',
             inspectionType: 'Vehicle Registration Inspection',
             expiredDate: new Date(2024, 6, 23),
             result: 'success',

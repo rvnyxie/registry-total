@@ -1,6 +1,8 @@
 <script lang="ts">
-	import { enhance } from '$app/forms';
-	import { goto } from '$app/navigation';
+	import { applyAction, enhance } from '$app/forms';
+	import { invalidateAll } from '$app/navigation';
+	import { page } from '$app/stores';
+	import { formatDate } from '$lib/helpers/format.js';
 	import { Label, Input, Button, Modal } from 'flowbite-svelte';
 	import {
 		Table,
@@ -11,111 +13,128 @@
 		TableHeadCell,
 		Checkbox
 	} from 'flowbite-svelte';
-	import { onMount, afterUpdate } from 'svelte';
 
 	export let form;
+	export let data;
 
-	type carInspection = {
-    inspection_id: string,
-    inspection_type: string,
-    inspection_date: string,
-    result: string,
-    expired_date: string
-    note: string
-}
+	let carInspections = data.carInspections;
 
-const default_inspection = [
-    {
-        inspection_id: "1",
-        inspection_type: "Regular",
-        inspection_date: "2023-04-01",
-        result: "Pass",
-        expired_date: "2024-04-01",
-        note: "No issues found"
-    },
-    {
-        inspection_id: "2",
-        inspection_type: "Safety",
-        inspection_date: "2023-03-15",
-        result: "Fail",
-        expired_date: "2024-03-15",
-        note: "Brake system needs repair"
-    },
-    {
-        inspection_id: "3",
-        inspection_type: "Emission",
-        inspection_date: "2023-02-20",
-        result: "Pass",
-        expired_date: "2024-02-20",
-        note: "Vehicle meets emission standards"
-    },
-    {
-        inspection_id: "4",
-        inspection_type: "Regular",
-        inspection_date: "2023-05-10",
-        result: "Pass",
-        expired_date: "2024-05-10",
-        note: "No issues found"
-    },
-    {
-        inspection_id: "5",
-        inspection_type: "Safety",
-        inspection_date: "2023-06-05",
-        result: "Pass",
-        expired_date: "2024-06-05",
-        note: "Seat belts replaced"
-    }
-]
+	// auto update carInspection in table whenever data.carInspections (returned from server load function) changes
+	// The data.carInspections will change when we create, edit or delete
+	$: carInspections = data.carInspections;
 
-	let inspections: carInspection[];
+	// Create a variable with type of carInspection but all properties are optional
+	let currentEditingCarInpection: Partial<(typeof carInspections)[number]> = {};
 
-	// TODO: cant access local storage without checking first
-	// let localModels = localStorage.getItem('inspections') as string;
-
-	// if (localModels !== null) {
-	// 	inspections = JSON.parse(localModels);
-	// } else {
-	// 	inspections = default_models;
-	// }
-
-	inspections = default_inspection;
-
-	console.log(inspections);
-
-	onMount(() => {
-		// normal user not allowed to access this page
-		const isAdmin = localStorage.getItem('role');
-		if (!isAdmin) {
-			goto('/');
-		}
-
-		// asign data to table
-	});
-
-	afterUpdate(() => {
-		// TODO: handle form submit
-	});
-
-	let newAndEditFormModal = false;
-	let deleteFormModal = false;
-
-	let currentEditingInspection: {
-		inspection_id?: string,
-		inspection_type?: string,
-		inspection_date?: string,
-		result?: string,
-        expired_date?: string,
-		note?: string
+	type NewCarInspection = {
+		carRegistrationNumber: string;
+		inspectionStationId: number;
+	};
+	let currentCreatingCarInpection: NewCarInspection = {
+		carRegistrationNumber: '',
+		inspectionStationId: data.carInspections[0].inspectionStationId
+			? data.carInspections[0].inspectionStationId
+			: -1
 	};
 
-	let listOfSelectedOwner: string[] = [];
+	// Variables responsible for modal showing
+	let creatingCarInspection = false;
+	let editingCarInspection = false;
+	let deletingCarInspection = false;
+
+	// Variables responsible for checkboxes functions to work
+	let selectedCarInspections: string[] = [];
+	let isTableHeadChecked = false;
+	let isAllTableRowChecked = false;
+	$: totalCarInspections = carInspections.length;
+
+	// Variable responsible for notifications states
+	let successfulCancel = false;
+
+	// Update state for notifications when operate on table
+	$: {
+		if (form?.status === 'success') {
+			setTimeout(() => {
+				if (form) {
+					form.status = '';
+					form.action = '';
+				}
+			}, 3000);
+		} else if (form?.action === 'failed') {
+		}
+	}
+
+	// Update carInspections based on results matched the search query
+	$: {
+		if (form?.status === 'success' && form?.action === 'searchCarInspections') {
+			const matchedCarInspectionIds = form?.matchedCarInspectionIds;
+
+			carInspections = carInspections.filter((carInspection) => {
+				return matchedCarInspectionIds?.includes(carInspection.id);
+			});
+
+			if (form) {
+				form.status = '';
+				form.action = '';
+			}
+		}
+	}
+
+	function createNewCarInspectionId(
+		carRegistrationNumber: string | undefined,
+		stationId: number | undefined,
+		currentDate: Date
+	) {
+		let finalCarInspectionId;
+
+		if (!carRegistrationNumber || !stationId || !currentDate) {
+			return '';
+		}
+
+		const day = currentDate.getDay().toString().padStart(2, '0');
+		const month = currentDate.getMonth().toString().padStart(2, '0');
+		const year = currentDate.getFullYear().toString().slice(-2);
+
+		const partOfRegistrationNumber = carRegistrationNumber.slice(0, 3);
+		const partOfStationId =
+			stationId.toString().length >= 3
+				? stationId.toString().slice(0, 3)
+				: stationId.toString().padStart(3, '0');
+		const partOfDate = `${day}${month}${year}`;
+		const randomPart = getRandomChars(3);
+
+		return (finalCarInspectionId = `${partOfRegistrationNumber}${partOfStationId}${partOfDate}${randomPart}`);
+	}
+
+	function getRandomChars(length: number) {
+		let result = '';
+		const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+		const charactersLength = characters.length;
+
+		for (let i = 0; i < length; i++) {
+			result += characters.charAt(Math.floor(Math.random() * charactersLength));
+		}
+
+		return result;
+	}
+
+	let newCarInspectionId: string;
+	$: {
+		newCarInspectionId = createNewCarInspectionId(
+			currentCreatingCarInpection?.carRegistrationNumber,
+			currentCreatingCarInpection?.inspectionStationId,
+			new Date()
+		);
+
+		console.log(newCarInspectionId);
+	}
 </script>
 
 <div class="w-1/2 bg-primary_color">
-	<form method="POST" class="bg-secondary_color" use:enhance>
+	<form method="POST" action="?/searchCarInspections" class="bg-secondary_color" use:enhance>
 		<Label for="search" class="" />
 		<Input
-			name="search"
+			name="searchQuery"
 			id="search"
 			placeholder="Enter your text here"
 			size="md"
@@ -144,45 +163,105 @@ const default_inspection = [
 			</Button>
 		</Input>
 	</form>
+
+	{#if form?.status === 'success' || form?.status === 'failed' || successfulCancel}
+		<div class="text-sm absolute right-14 top-16">
+			<div class="flex flex-col gap-4">
+				{#if form?.status === 'success'}
+					{#if form?.action === 'createCarInspection'}
+						<div>
+							<p class="text-sm p-2 bg-light_green text-brown font-bold rounded-lg">
+								Created Successful!
+							</p>
+						</div>
+					{:else if form?.action === 'deleteCarInspection'}
+						<div>
+							<p class="text-sm p-2 bg-light_green text-brown font-bold rounded-lg">
+								Deleted Successful!
+							</p>
+						</div>
+					{:else if form?.action === 'deleteManyCarInspections	'}
+						<div>
+							<p class="text-sm p-2 bg-light_green text-brown font-bold rounded-lg">
+								Deleted Successful!
+							</p>
+						</div>
+					{:else if form?.action === 'editCarInspection'}
+						<div>
+							<p class="text-sm p-2 bg-light_green text-brown font-bold rounded-lg">
+								Editted Successful!
+							</p>
+						</div>
+					{/if}
+				{/if}
+
+				{#if successfulCancel}
+					<div>
+						<p
+							class="text-sm p-2 px-6 text-center bg-error_red text-light_yellow font-bold rounded-lg"
+						>
+							Canceled!
+						</p>
+					</div>
+				{/if}
+			</div>
+		</div>
+	{/if}
 </div>
 
 <div class="grow w-4/5 rounded-xl p-4 bg-gray-50 overflow-scroll">
-	<div class="flex justify-end">
-		{#if listOfSelectedOwner.length === inspections.length}
+	<div class="flex justify-between flex-row-reverse">
+		<Button
+			class="mb-2"
+			size="xs"
+			on:click={() => {
+				creatingCarInspection = true;
+				currentEditingCarInpection = {};
+			}}
+		>
+			New
+		</Button>
+		{#if selectedCarInspections.length > 1}
 			<Button
 				class="mb-2"
 				size="xs"
 				on:click={() => {
-					deleteFormModal = true;
+					deletingCarInspection = true;
 				}}
 			>
 				Delete Selected
 			</Button>
 		{/if}
-		<Button
-			class="mb-2"
-			size="xs"
-			on:click={() => {
-				newAndEditFormModal = true;
-				currentEditingInspection = {};
-			}}
-		>
-			New
-		</Button>
 	</div>
-
-	<!-- Table here -->
 	<Table hoverable={true} striped={true} color="default">
 		<TableHead class="bg-gray-200">
 			<TableHeadCell class="!p-4">
-				<Checkbox />
+				<Checkbox
+					checked={isAllTableRowChecked}
+					on:click={() => {
+						// if checked = true, all the carInspections need to be checked
+						isTableHeadChecked = !isTableHeadChecked;
+
+						// when TableHead is checked, add all carInspections id to selectedCarInspections list
+						// reset selectedCarInspections when uncheck
+						if (isTableHeadChecked) {
+							selectedCarInspections = carInspections.map((carInspection) => carInspection.id);
+						} else {
+							selectedCarInspections = [];
+						}
+					}}
+				/>
 			</TableHeadCell>
-			<TableHeadCell>Car inspection ID</TableHeadCell>
-			<TableHeadCell>Car inspection Type</TableHeadCell>
-			<TableHeadCell>inspection_date</TableHeadCell>
+			<TableHeadCell>Car Inspection ID</TableHeadCell>
+			<TableHeadCell>Inspection Type</TableHeadCell>
+			<TableHeadCell>Inspection Date</TableHeadCell>
 			<TableHeadCell>result</TableHeadCell>
 			<TableHeadCell>Expired Date</TableHeadCell>
 			<TableHeadCell>Note</TableHeadCell>
+			<TableHeadCell>Car Registration Number</TableHeadCell>
+			<TableHeadCell>Car License Plate Number</TableHeadCell>
+			<TableHeadCell>Inspection Station ID</TableHeadCell>
+			<TableHeadCell>Inspection Station Name</TableHeadCell>
 			<TableHeadCell>
 				<span class="sr-only"> Edit </span>
 			</TableHeadCell>
@@ -191,36 +270,49 @@ const default_inspection = [
 			</TableHeadCell>
 		</TableHead>
 		<TableBody>
-			{#each inspections as inspection}
+			{#each carInspections as carInspection}
 				<TableBodyRow>
 					<TableBodyCell class="!p-4">
 						<Checkbox
+							checked={isTableHeadChecked}
 							on:click={() => {
-								const index = listOfSelectedOwner.findIndex(
-									(inspection_id) => (inspection.inspection_id = inspection_id)
-								);
-
-								if (index === -1) {
-									listOfSelectedOwner = [...listOfSelectedOwner, inspection.inspection_id];
+								// if carInspection.id is in selectedCarInspections, remove it
+								// else add it
+								// note: reactivity in svelte is triggered by assignment
+								if (selectedCarInspections.includes(carInspection.id)) {
+									selectedCarInspections = selectedCarInspections.filter(
+										(id) => carInspection.id !== id
+									);
 								} else {
-									listOfSelectedOwner.splice(index, 1);
+									selectedCarInspections = [...selectedCarInspections, carInspection.id];
+								}
+
+								// if all carInspections are checked, then checkbox in TableHead is checked
+								if (selectedCarInspections.length === totalCarInspections) {
+									isAllTableRowChecked = true;
+								} else {
+									isAllTableRowChecked = false;
 								}
 							}}
 						/>
 					</TableBodyCell>
-					<TableBodyCell>{inspection?.inspection_id}</TableBodyCell>
-					<TableBodyCell>{inspection?.inspection_type}</TableBodyCell>
-					<TableBodyCell>{inspection?.inspection_date}</TableBodyCell>
-					<TableBodyCell>{inspection?.result}</TableBodyCell>
-                    <TableBodyCell>{inspection?.expired_date}</TableBodyCell>
-					<TableBodyCell>{inspection?.note}</TableBodyCell>
+					<TableBodyCell>{carInspection?.id}</TableBodyCell>
+					<TableBodyCell>{carInspection?.inspectionType}</TableBodyCell>
+					<TableBodyCell>{formatDate(carInspection?.inspectionDate)}</TableBodyCell>
+					<TableBodyCell>{carInspection?.result}</TableBodyCell>
+					<TableBodyCell>{formatDate(carInspection?.expiredDate)}</TableBodyCell>
+					<TableBodyCell>{carInspection?.note}</TableBodyCell>
+					<TableBodyCell>{carInspection?.car?.registrationNumber}</TableBodyCell>
+					<TableBodyCell>{carInspection?.car?.licensePlateNumber}</TableBodyCell>
+					<TableBodyCell>{carInspection?.inspectionStationId}</TableBodyCell>
+					<TableBodyCell>{carInspection?.inspectionStation?.stationName}</TableBodyCell>
 					<TableBodyCell>
 						<Button
 							size="xs"
 							color="dark"
 							on:click={() => {
-								newAndEditFormModal = true;
-								currentEditingInspection = inspection;
+								editingCarInspection = true;
+								currentEditingCarInpection = carInspection;
 							}}
 						>
 							Edit
@@ -229,8 +321,8 @@ const default_inspection = [
 							size="xs"
 							color="red"
 							on:click={() => {
-								deleteFormModal = true;
-								currentEditingInspection = inspection;
+								deletingCarInspection = true;
+								currentEditingCarInpection = carInspection;
 							}}
 						>
 							Delete
@@ -240,54 +332,175 @@ const default_inspection = [
 			{/each}
 		</TableBody>
 
-		<Modal bind:open={newAndEditFormModal} outsideclose={true} size="md" class="w-full">
-			<form method="POST" action="?/changeUser" use:enhance>
+		<!-- New Modal -->
+		<Modal bind:open={creatingCarInspection} outsideclose={true} size="md" class="w-full">
+			<form
+				method="POST"
+				action="?/createCarInspection"
+				use:enhance={() => {
+					return async ({ result }) => {
+						if (result.status === 200) {
+							invalidateAll();
+							creatingCarInspection = false;
+						}
+
+						// Reset the id after form submission
+						newCarInspectionId = '';
+
+						await applyAction(result);
+					};
+				}}
+			>
 				<Label class="space-y-2">
-					<span>Car inspection ID</span>
+					<span>Car Inspection ID</span>
 					<Input
 						type="text"
-						name="inspection_id"
-						placeholder="a string..."
-						value={currentEditingInspection?.inspection_id}
+						name="id"
+						placeholder="This field will be created automatically!"
+						bind:value={newCarInspectionId}
+						color="green"
+						readonly
 					/>
 				</Label>
 				<Label class="space-y-2">
-					<span>Car inspection Type</span>
+					<span>Inspection Type</span>
+					<Input type="text" name="inspectionType" placeholder="Safety inspection" />
+				</Label>
+				<Label class="space-y-2">
+					<span>Result</span>
+					<Input type="text" name="result" placeholder="success/failed" />
+				</Label>
+				<Label class="space-y-2">
+					<span>Expired Date</span>
+					<Input type="text" name="expiredDate" placeholder="1 year" />
+				</Label>
+				<Label class="space-y-2">
+					<span>Note</span>
+					<Input type="text" name="note" placeholder="Extra info..." />
+				</Label>
+				<Label class="space-y-2">
+					<span>Car Registration Number</span>
 					<Input
 						type="text"
-						name="inspection_type"
-						placeholder="car name"
-						value={currentEditingInspection?.inspection_type}
+						name="registrationNumber"
+						placeholder="111222"
+						bind:value={currentCreatingCarInpection.carRegistrationNumber}
+					/>
+				</Label>
+				<Label class="space-y-2">
+					<span>Car License Plate Number</span>
+					<Input type="text" name="licensePlateNumber" placeholder="30A-777.77" />
+				</Label>
+				<Label class="space-y-2">
+					<span>Inspection Station ID</span>
+					<Input
+						type="text"
+						name="inspectionStationId"
+						placeholder="1"
+						color="green"
+						bind:value={currentCreatingCarInpection.inspectionStationId}
+						readonly
+					/>
+				</Label>
+
+				<div class="flex flex-row items-center justify-center">
+					<Button
+						type="button"
+						color="red"
+						on:click={() => {
+							creatingCarInspection = false;
+							successfulCancel = true;
+
+							// Turn off state to close notification
+							setTimeout(() => {
+								successfulCancel = false;
+							}, 2000);
+						}}>Cancel</Button
+					>
+					<Button
+						type="submit"
+						class="my-4 rounded-xl bg-light_green text-[#675D50] hover:bg-orange hover:text-white m-2"
+						color="none">Add</Button
+					>
+				</div>
+
+				{#if form?.status === 'failed' && form?.invalidData}
+					<p class="text-base text-error_red font-semibold text-center">{form?.message}</p>
+				{/if}
+
+				{#if form?.status === 'success'}
+					<p class="text-base text-[#00b300] font-semibold text-center">{form?.message}</p>
+				{/if}
+			</form>
+		</Modal>
+
+		<!-- Edit Modal -->
+		<Modal bind:open={editingCarInspection} outsideclose={true} size="md" class="w-full">
+			<form
+				method="POST"
+				action="?/editCarInspection"
+				use:enhance={() => {
+					return async ({ result }) => {
+						if (result.status === 200) {
+							invalidateAll();
+							editingCarInspection = false;
+						}
+
+						await applyAction(result);
+					};
+				}}
+			>
+				<Label class="space-y-2">
+					<span>Car Inspeciton ID</span>
+					<Input
+						type="text"
+						name="id"
+						placeholder="444333NIS230623XZ"
+						value={currentEditingCarInpection?.id}
+						color="green"
+						readonly
+					/>
+				</Label>
+
+				<Label class="space-y-2">
+					<span>Inspection Type</span>
+					<Input
+						type="text"
+						name="inspectionType"
+						placeholder="Safety inspection"
+						value={currentEditingCarInpection?.inspectionType}
+						required
 					/>
 				</Label>
 				<Label class="space-y-2">
 					<span>Inspection Date</span>
 					<Input
 						type="text"
-						name="inspection_date"
-						placeholder="Toyota..."
-						value={currentEditingInspection?.inspection_date}
+						name="inspectionDate"
+						placeholder="Mon Jun 26 2023 13:57:31"
+						value={formatDate(currentEditingCarInpection?.inspectionDate)}
+						color="green"
+						readonly
+					/>
+				</Label>
+				<Label class="space-y-2">
+					<span>result</span>
+					<Input
+						type="text"
+						name="result"
+						placeholder="success/failed"
+						value={currentEditingCarInpection?.result}
 						required
 					/>
 				</Label>
 				<Label class="space-y-2">
-					<span>Result</span>
-					<Input
-						type="text"
-						name="result"
-						placeholder="result..."
-						value={currentEditingInspection?.result}
-						required
-					/>
-				</Label>
-                <Label class="space-y-2">
 					<span>Expired Date</span>
 					<Input
 						type="text"
-						name="expired_date"
-						placeholder="05 05 2023..."
-						value={currentEditingInspection?.expired_date}
-						required
+						name="expiredDate"
+						class="hidden"
+						placeholder="Mon Jun 26 2024 13:57:31"
+						value={formatDate(currentEditingCarInpection?.expiredDate)}
 					/>
 				</Label>
 				<Label class="space-y-2">
@@ -295,43 +508,69 @@ const default_inspection = [
 					<Input
 						type="text"
 						name="note"
-						placeholder="Some note..."
-						value={currentEditingInspection?.note}
-						required
+						placeholder="Extra info..."
+						value={currentEditingCarInpection?.note}
 					/>
 				</Label>
-			
+				<Label class="space-y-2">
+					<span>Car Registration Number</span>
+					<Input
+						type="text"
+						name="registrationNumber"
+						placeholder="Automatic..."
+						value={currentEditingCarInpection?.car?.registrationNumber}
+						readonly
+					/>
+				</Label>
+				<Label class="space-y-2">
+					<span>Inspection Station ID</span>
+					<Input
+						type="text"
+						name="inspectionStationId"
+						placeholder="1"
+						value={currentEditingCarInpection?.inspectionStationId}
+					/>
+				</Label>
+
 				<div class="flex flex-row items-center justify-center">
-					<!-- currentEditingInspection is modified based on which button user click -->
-					{#if currentEditingInspection?.inspection_id === undefined}
-						<!-- Add new user -->
-						<Input type="text" name="action_type" value="add_user" class="hidden" />
-						<Button type="button" color="red" on:click={() => (newAndEditFormModal = false)}
-							>Cancel</Button
-						>
-						<Button
-							type="submit"
-							class="my-4 rounded-xl bg-light_green text-[#675D50] hover:bg-orange hover:text-white m-2"
-							color="none">Add</Button
-						>
-					{:else}
-						<!-- Edit user -->
-						<Input type="text" name="action_type" value="edit_user" class="hidden" />
-						<Button type="button" color="alternative" on:click={() => (newAndEditFormModal = false)}
-							>Cancel</Button
-						>
-						<Button
-							type="submit"
-							class="my-4 rounded-xl bg-light_green text-[#675D50] hover:bg-orange hover:text-white m-2"
-							color="red">Edit</Button
-						>
-					{/if}
+					<Button
+						type="button"
+						color="alternative"
+						on:click={() => {
+							editingCarInspection = false;
+							successfulCancel = true;
+
+							// Turn off state to close notification
+							setTimeout(() => {
+								successfulCancel = false;
+							}, 2000);
+						}}>Cancel</Button
+					>
+					<Button
+						type="submit"
+						class="my-4 rounded-xl bg-light_green text-[#675D50] hover:bg-orange hover:text-white m-2"
+						color="red">Save</Button
+					>
 				</div>
 			</form>
 		</Modal>
 
-		<Modal bind:open={deleteFormModal} outsideclose={true} size="md" class="w-full">
-			<form method="POST" action="?/deleteOwner" use:enhance>
+		<!-- Delete Modal -->
+		<Modal bind:open={deletingCarInspection} outsideclose={true} size="md" class="w-full">
+			<form
+				method="POST"
+				action="?/deleteCarInspection"
+				use:enhance={() => {
+					return async ({ result }) => {
+						if (result.status === 200) {
+							invalidateAll();
+							deletingCarInspection = false;
+						}
+
+						await applyAction(result);
+					};
+				}}
+			>
 				<div class="text-center">
 					<svg
 						aria-hidden="true"
@@ -348,26 +587,49 @@ const default_inspection = [
 						/></svg
 					>
 
-					{#if listOfSelectedOwner.length > 1}
+					{#if selectedCarInspections.length > 1}
 						<h3 class="mb-5 text-lg font-normal text-gray-500 dark:text-gray-400">
-							Are you sure you want to delete <strong>THESE</strong> inspections?
+							Are you sure you want to delete <strong>THESE</strong> selected car inspections?
 						</h3>
+						<Input type="text" name="ids" class="hidden" value={selectedCarInspections} />
+						<Button
+							type="button"
+							color="alternative"
+							on:click={() => {
+								deletingCarInspection = false;
+								successfulCancel = true;
+
+								// Turn off state to close notification
+								setTimeout(() => {
+									successfulCancel = false;
+								}, 2000);
+							}}>No, cancel</Button
+						>
+						<Button type="submit" color="red" class="mr-2" formaction="?/deleteManyCarInspections"
+							>Yes, I'm sure</Button
+						>
 					{:else}
 						<h3 class="mb-5 text-lg font-normal text-gray-500 dark:text-gray-400">
-							Are you sure you want to delete this inspection?
+							Are you sure you want to delete this car inspection?
 						</h3>
-					{/if}
+						<Input type="text" name="id" class="hidden" value={currentEditingCarInpection.id} />
+						<Button
+							type="button"
+							color="alternative"
+							on:click={() => {
+								deletingCarInspection = false;
+								successfulCancel = true;
 
-					<Input
-						type="text"
-						name="user_id"
-						class="hidden"
-						value={currentEditingInspection.inspection_id}
-					/>
-					<Button type="button" color="alternative" on:click={() => (deleteFormModal = false)}
-						>No, cancel</Button
-					>
-					<Button type="submit" color="red" class="mr-2">Yes, I'm sure</Button>
+								// Turn off state to close notification
+								setTimeout(() => {
+									successfulCancel = false;
+								}, 2000);
+							}}>No, cancel</Button
+						>
+						<Button type="submit" color="red" class="mr-2" formaction="?/deleteCarInspection"
+							>Yes, I'm sure</Button
+						>
+					{/if}
 				</div>
 			</form>
 		</Modal>

@@ -1,4 +1,7 @@
-export function formatDate(date: Date) {
+export function formatDate(date: Date | undefined) {
+    if (!date) {
+        return '';
+    }
     return date.toLocaleDateString('en-US', {
         weekday: 'short',
         month: 'long',
