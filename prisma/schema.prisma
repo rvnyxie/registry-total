@@ -39,7 +39,7 @@ model Car {
 
 model CarModel {
   id               Int    @id @default(autoincrement())
-  modelName        String @unique
+  modelName        String
   manufacturer     String
   version          String
   engineType       String
@@ -49,6 +49,8 @@ model CarModel {
   torque           String
   seatingCapacity  Int
   car              Car[]
+
+  @@unique([modelName, version, engineType, fuelType, seatingCapacity])
 }
 
 model UsagePurpose {
