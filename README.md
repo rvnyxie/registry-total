@@ -4,7 +4,21 @@ RegistryTotal is a web application developed to support the Vehicle Registration
 Here is the [Figma design](https://www.figma.com/file/gMfg7f2zmkh2htwS3nbNgu/RegistryTotal-Design?type=design&node-id=0%3A1&mode=design&t=Y0UUur5GRfDrIUBv-1) for this project. This is used as a sample for the development and the final product can be a bit different.<br>
 You can find more information about the description of what features the system should support [here](https://itest.com.vn/lects/webappdev/mockproj/registry-total.htm).<br>
 
-## Technology used:
+## Working application
+Check out the [live application](https://registry-total-poz1.onrender.com) here!
+
+### Login
+![Login page](/src//lib//assets/LoginPage.png)
+
+### Main
+![Main page](/src//lib//assets/HomePage.png)
+
+### Tables
+![User page](/src//lib/assets/UserPage.png)
+![Quick table CRUD](/src/lib/assets/TablesQuickTest.gif)
+***Note: Click to the gif to see better version!***
+
+## Technologies
 - SvelteKit
 - Flowbite-Svelte
 
