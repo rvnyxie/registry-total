@@ -83,35 +83,70 @@ type UpdatedUser = {
 export async function updateUser(updatedUser: UpdatedUser) {
     const { id, username, password, isAdminValue, email, inspectionStationId, inspectionStationExist } = updatedUser
 
-    if (!inspectionStationExist) {
-        await db.user.update({
-            where: { id: Number(id) },
-            data: {
-                username: username,
-                password: await bcrypt.hash(password, 10),
-                email: email,
-                isAdmin: isAdminValue,
-                updatedAt: new Date(),
-                inspectionStationId: null
-            }
-        })
-    } else {
-        await db.user.update({
-            where: { id: Number(id) },
-            data: {
-                username: username,
-                password: await bcrypt.hash(password, 10),
-                email: email,
-                isAdmin: isAdminValue,
-                updatedAt: new Date(),
-                inspectionStation: {
-                    connect: {
-                        id: Number(inspectionStationId)
+    const userWillBeUpdated = await db.user.findUnique({
+        where: { id: Number(updatedUser.id) }
+    })
+
+    if (password !== userWillBeUpdated?.password) {
+        if (!inspectionStationExist) {
+            await db.user.update({
+                where: { id: Number(id) },
+                data: {
+                    username: username,
+                    password: await bcrypt.hash(password, 10),
+                    email: email,
+                    isAdmin: isAdminValue,
+                    updatedAt: new Date(),
+                    inspectionStationId: null
+                }
+            })
+        } else {
+            await db.user.update({
+                where: { id: Number(id) },
+                data: {
+                    username: username,
+                    password: await bcrypt.hash(password, 10),
+                    email: email,
+                    isAdmin: isAdminValue,
+                    updatedAt: new Date(),
+                    inspectionStation: {
+                        connect: {
+                            id: Number(inspectionStationId)
+                        }
                     }
                 }
-            }
-        })
+            })
+        }
+    } else {
+        if (!inspectionStationExist) {
+            await db.user.update({
+                where: { id: Number(id) },
+                data: {
+                    username: username,
+                    email: email,
+                    isAdmin: isAdminValue,
+                    updatedAt: new Date(),
+                    inspectionStationId: null
+                }
+            })
+        } else {
+            await db.user.update({
+                where: { id: Number(id) },
+                data: {
+                    username: username,
+                    email: email,
+                    isAdmin: isAdminValue,
+                    updatedAt: new Date(),
+                    inspectionStation: {
+                        connect: {
+                            id: Number(inspectionStationId)
+                        }
+                    }
+                }
+            })
+        }
     }
+
 }
 
 export async function checkIfUserIdExist(id: number) {
