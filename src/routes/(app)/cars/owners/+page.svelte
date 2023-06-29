@@ -40,14 +40,13 @@
 
 	// Update state for notifications when operate on table
 	$: {
-		if (form?.status === 'success') {
+		if (form?.status === 'success' || form?.status === 'failed') {
 			setTimeout(() => {
 				if (form) {
 					form.status = '';
 					form.action = '';
 				}
 			}, 3000);
-		} else if (form?.action === 'failed') {
 		}
 	}
 
@@ -128,6 +127,24 @@
 						<div>
 							<p class="text-sm p-2 bg-light_green text-brown font-bold rounded-lg">
 								Editted Successful!
+							</p>
+						</div>
+					{/if}
+				{:else if form?.status === 'failed'}
+					{#if form?.action === 'deleteOwner'}
+						<div>
+							<p
+								class="text-sm p-2 px-6 text-center bg-error_red text-light_yellow font-bold rounded-lg"
+							>
+								{form?.message}
+							</p>
+						</div>
+					{:else if form?.action === 'deleteManyOwners'}
+						<div>
+							<p
+								class="text-sm p-2 px-6 text-center bg-error_red text-light_yellow font-bold rounded-lg"
+							>
+								{form?.message}
 							</p>
 						</div>
 					{/if}
@@ -499,6 +516,8 @@
 					return async ({ result }) => {
 						if (result.status === 200) {
 							invalidateAll();
+							deletingOwner = false;
+						} else {
 							deletingOwner = false;
 						}
 

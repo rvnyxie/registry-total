@@ -5,6 +5,8 @@ import db from '$lib/server/database'
 import {
     checkIfIdOrPhonenumbeOrEmailExisted,
     checkIfOnlyOneOwnerMatch,
+    checkIfOwnerReferencedByOtherRecords,
+    checkIfOwnersReferencedByOtherRecords,
     searchOwnersMatchedWithQuery
 } from '$lib/server/helpers/owner.operations'
 
@@ -209,16 +211,27 @@ async function deleteOwner(event: RequestEvent) {
         return fail(400, { status: 'failed', action: 'deleteOwner', invalidData: true, message: 'Owner id is required!' })
     }
 
-    const deleteOwner = await db.owner.delete({
-        where: { id: deleteOwnerId.toString() }
-    })
+    try {
+        const isOwnerReferencedByOtherRecords = await checkIfOwnerReferencedByOtherRecords(deleteOwnerId.toString())
 
-    if (!deleteOwner) {
-        return fail(400, { status: 'failed', action: 'deleteOwner', invalidData: true, message: 'Owner does not exist!' })
+        if (isOwnerReferencedByOtherRecords) {
+            return fail(400, { status: 'failed', action: 'deleteOwner', invalidData: true, message: 'Unable to delete owner. Owner is referenced by other records!' })
+        }
+
+        const deleteOwner = await db.owner.delete({
+            where: { id: deleteOwnerId.toString() }
+        })
+
+        if (!deleteOwner) {
+            return fail(400, { status: 'failed', action: 'deleteOwner', invalidData: true, message: 'Owner does not exist!' })
+        }
+
+        console.log('Owner deleted successfully!')
+        return { status: 'success', action: 'deleteOwner', invalidData: false, message: 'Owner deleted successfully!' }
+    } catch (error) {
+        console.error(error)
+        return fail(400, { status: 'failed', action: 'deleteOwner', invalidData: true, message: 'Unable to delete owner. Something went wrong!' })
     }
-
-    console.log('Owner deleted successfully!')
-    return { status: 'success', action: 'deleteOwner', invalidData: false, message: 'Owner deleted successfully!' }
 }
 
 async function deleteManyOwners(event: RequestEvent) {
@@ -240,19 +253,32 @@ async function deleteManyOwners(event: RequestEvent) {
             // There is only one id
             deleteOwnerIds = [rawDeleteOwnerIds.toString()]
         } else {
-            deleteOwnerIds = rawDeleteOwnerIds?.toString().split(',')
+            deleteOwnerIds = rawDeleteOwnerIds?.toString().split(',') as string[]
         }
 
-        const deleteOwners = await db.owner.deleteMany({
-            where: { id: { in: deleteOwnerIds } }
-        })
+        try {
+            const isOwnersReferencedByOtherRecords = await checkIfOwnersReferencedByOtherRecords(deleteOwnerIds)
 
-        if (deleteOwners.count === 0) {
-            return fail(400, { status: 'failed', action: 'deleteManyOwners', invalidData: true, message: 'Owners do not exist!' })
+            if (isOwnersReferencedByOtherRecords) {
+                return fail(400, { status: 'failed', action: 'deleteManyOwners', invalidData: true, message: 'Unable to delete owner. One or many owners are referenced by other records!' })
+            }
+
+            const deleteOwners = await db.owner.deleteMany({
+                where: { id: { in: deleteOwnerIds } }
+            })
+
+            if (deleteOwners.count === 0) {
+                return fail(400, { status: 'failed', action: 'deleteManyOwners', invalidData: true, message: 'Owners do not exist!' })
+            }
+
+            console.log('Owners deleted successfully!')
+            return { status: 'success', action: 'deleteManyOwners', invalidData: false, message: 'Owners deleted successfully!' }
+        } catch (error) {
+            console.error(error)
+            return fail(400, { status: 'failed', action: 'deleteManyOwners', invalidData: true, message: 'Unable to delete owners. The owner may be referenced by other records' })
         }
 
-        console.log('Owners deleted successfully!')
-        return { status: 'success', action: 'deleteManyOwners', invalidData: false, message: 'Owners deleted successfully!' }
+
     } else {
         return fail(400, { status: 'failed', action: 'deleteManyOwners', invalidData: true, message: 'Owner ids are required! Invalid owner ids!' })
     }
