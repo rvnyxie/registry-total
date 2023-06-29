@@ -5,6 +5,9 @@ import db from '$lib/server/database'
 import {
     checkIfCarModelIdExists,
     checkIfCarModelNameExists,
+    checkIfCarModelReferencedByOtherRecords,
+    checkIfCarModelsReferencedByOtherRecords,
+    checkIfOnlyOneCarModelExists,
     searchCarModelsMatchedWithQuery
 } from '$lib/server/helpers/carModel.operations'
 
@@ -42,9 +45,9 @@ async function createCarModel(event: RequestEvent) {
     const newCarModel = formData as unknown as { modelName: string, manufacturer: string, version: string, engineType: string, fuelType: string, transmissionType: string, horsepower: string, torque: string, seatingCapacity: string }
 
     try {
-        const isCarModelNameExisted = await checkIfCarModelNameExists(newCarModel.modelName)
+        const isOnlyOneCarModelNameExisted = await checkIfOnlyOneCarModelExists(newCarModel.modelName, newCarModel.version, newCarModel.engineType, newCarModel.fuelType, newCarModel.seatingCapacity)
 
-        if (isCarModelNameExisted) {
+        if (isOnlyOneCarModelNameExisted) {
             return fail(400, { status: 'failed', action: 'createCarModel', invalidData: true, message: 'CarModel already exists!' })
         }
 
@@ -155,16 +158,28 @@ async function deleteCarModel(event: RequestEvent) {
         return fail(400, { status: 'failed', action: 'deleteCarModel', invalidId: true, message: 'Car model ID is required!' })
     }
 
-    const deleteCarModel = await db.carModel.delete({
-        where: { id: parseInt(deleteCarModelId) }
-    })
+    try {
+        const isCarModelReferencedByOtherRecords = await checkIfCarModelReferencedByOtherRecords(parseInt(deleteCarModelId))
 
-    if (!deleteCarModel) {
-        return fail(400, { status: 'failed', action: 'deleteCarModel', invalidId: true, message: 'Car model does not exist to be deleted!' })
+        if (isCarModelReferencedByOtherRecords) {
+            return fail(400, { status: 'failed', action: 'deleteCarModel', invalidId: true, message: 'Unable to delete! Car model is referenced by other records!' })
+        }
+
+        const deleteCarModel = await db.carModel.delete({
+            where: { id: parseInt(deleteCarModelId) }
+        })
+
+        if (!deleteCarModel) {
+            return fail(400, { status: 'failed', action: 'deleteCarModel', invalidId: true, message: 'Car model does not exist to be deleted!' })
+        }
+
+        console.log('Car model deleted successfully!')
+        return { status: 'success', action: 'deleteCarModel', invalidId: false, message: 'Car model deleted successfully!' }
+    } catch (error) {
+        console.error(error)
+        return fail(400, { status: 'failed', action: 'deleteCarModel', invalidId: true, message: 'Unable to delete car model. Something went wrong!' })
     }
 
-    console.log('Car model deleted successfully!')
-    return { status: 'success', action: 'deleteCarModel', invalidId: false, message: 'Car model deleted successfully!' }
 }
 
 async function deleteManyCarModels(event: RequestEvent) {
@@ -188,16 +203,27 @@ async function deleteManyCarModels(event: RequestEvent) {
             deleteCarModelIds = rawDeleteCarModelIds.split(',').map(id => parseInt(id))
         }
 
-        const deletedCarModels = await db.carModel.deleteMany({
-            where: { id: { in: deleteCarModelIds } }
-        })
+        try {
+            const isCarModelsReferencedByOtherRecords = await checkIfCarModelsReferencedByOtherRecords(deleteCarModelIds)
 
-        if (deletedCarModels.count === 0) {
-            return fail(400, { status: 'failed', action: 'deleteCarModel', invalidIds: true, message: 'Car models do not exist!' })
+            if (isCarModelsReferencedByOtherRecords) {
+                return fail(400, { status: 'failed', action: 'deleteManyCarModels', invalidId: true, message: 'Unable to delete! One or many car models are referenced by other records!' })
+            }
+
+            const deletedCarModels = await db.carModel.deleteMany({
+                where: { id: { in: deleteCarModelIds } }
+            })
+
+            if (deletedCarModels.count === 0) {
+                return fail(400, { status: 'failed', action: 'deleteCarModel', invalidIds: true, message: 'Car models do not exist!' })
+            }
+
+            console.log('Car models deleted successfully!')
+            return { status: 'success', action: 'deleteManyCarModels', invalidIds: false, message: 'Car models deleted successfully!' }
+        } catch (error) {
+            console.error(error)
+            return fail(400, { status: 'failed', action: 'deleteManyCarModels', invalidIds: true, message: 'Unable to delete car models. Something went wrong!' })
         }
-
-        console.log('Car models deleted successfully!')
-        return { status: 'success', action: 'deleteManyCarModels', invalidIds: false, message: 'Car models deleted successfully!' }
     } else {
         return fail(400, { status: 'failed', action: 'deleteManyCarModels', invalidIds: true, message: 'Car model IDs are required!' })
     }

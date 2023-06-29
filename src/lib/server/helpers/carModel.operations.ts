@@ -1,15 +1,26 @@
 import db from '$lib/server/database'
 
-export async function checkIfCarModelNameExists(modelName: string) {
-    const carModel = await db.carModel.findUnique({
-        where: { modelName }
+export async function checkIfOnlyOneCarModelExists(modelName: string, version: string, engineType: string, fuelType: string, seatingCapacity: string) {
+    const carModel = await db.carModel.findMany({
+        where: {
+            AND: [
+                {
+                    modelName,
+                    version,
+                    engineType,
+                    fuelType,
+                    seatingCapacity: parseInt(seatingCapacity)
+                }
+            ]
+
+        }
     })
 
-    if (!carModel) {
-        return false
+    if (carModel.length === 1) {
+        return true
     }
 
-    return true
+    return false
 }
 
 export async function checkIfCarModelIdExists(id: number) {
@@ -22,6 +33,42 @@ export async function checkIfCarModelIdExists(id: number) {
     }
 
     return true
+}
+
+export async function checkIfCarModelReferencedByOtherRecords(id: number) {
+    const carModel = await db.carModel.findUnique({
+        where: { id },
+        select: {
+            car: {
+                select: { id: true }
+            }
+        }
+    })
+
+    if (!carModel || carModel.car.length !== 0) {
+        return true
+    }
+
+    return false
+}
+
+export async function checkIfCarModelsReferencedByOtherRecords(ids: number[]) {
+    const carModels = await db.carModel.findMany({
+        where: { id: { in: ids } },
+        select: {
+            car: {
+                select: { id: true }
+            }
+        }
+    })
+
+    for (const carModel of carModels) {
+        if (carModel.car.length !== 0) {
+            return true
+        }
+    }
+
+    return false
 }
 
 export async function searchCarModelsMatchedWithQuery(searchQuery: string) {
